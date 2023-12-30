@@ -143,6 +143,7 @@ pub(crate) mod chess {
         }
 
         pub(crate) mod helper_traits {
+
             use super::{helper_types::*, helper_consts::*};
 
             pub(crate) trait Colored {
@@ -440,11 +441,13 @@ pub(crate) mod chess {
                         }
                     }
 
-                    for knight_square in square.get_king_offset_squares() {
+                    for knight_square in square.get_knight_offset_squares() {
+                        // let readable_square = standardize(knight_square);
+                        // println!("Checking knight move square: {}", readable_square.to_string());
                         match self.query_square(knight_square).get_contents() {
                             None => {},
                             Some(piece) => {
-                                if piece.get_color() != defending_color && piece.get_piece_type() == EnumPiecesUncolored::Knight {
+                                if (piece.get_color() != defending_color) && (piece.get_piece_type() == EnumPiecesUncolored::Knight) {
                                     return true
                                 }
                             },
@@ -748,6 +751,7 @@ pub(crate) mod chess {
                         EnumColor::White => self.get_b_king_square(),
                         EnumColor::Black => self.get_w_king_square(),
                     };
+                    // let debug_help = self.sees_obvious_attack(self.get_opposite_color(), relevant_king_square);
                     self.sees_obvious_attack(self.get_opposite_color(), relevant_king_square)
                 }
                 fn is_stalemate(&self) -> bool {
@@ -788,11 +792,17 @@ pub(crate) mod chess {
                     match possible_move.get_move() {
                         ChessMove::NullMove => true,
                         ChessMove::StandardMove(proposed_move) => {
+                            // Do the faster check first.
                             if self.is_pinned(proposed_move.from_square) {
                                 return false
-                            } else if !self.mover_in_check() {
+                            } else /*if !self.mover_in_check() {
                                 return true
-                            } else {
+                            } else*/ {
+                                // If the fast check fails, do the full check. 
+                                // This is probably useless because of cache stuff, but bitboards make
+                                // optimizing this version of movegen beyond ``workable" a waste of time imo.
+                                // let is_legal = ! ((self.after_move(possible_move)).non_mover_in_check());
+                                // return is_legal
                                 return !self.after_move(possible_move).non_mover_in_check()
                             }
                         },
@@ -1229,6 +1239,7 @@ pub(crate) mod chess {
                     } else {
                         self.increment_ply()
                     }
+                    let mut update_king_square = None;
                     match possible_move.get_move() {
                         ChessMove::StandardMove(updating_move) => {
                             self.remove_castling(updating_move.from_square);
@@ -1245,10 +1256,7 @@ pub(crate) mod chess {
                                         self.set_ep_square(None)
                                     }
                                     if piece.get_piece_type() == EnumPiecesUncolored::King {
-                                        match piece.get_color() {
-                                            EnumColor::White => self.set_w_king_square(updating_move.to_square),
-                                            EnumColor::Black => self.set_b_king_square(updating_move.to_square),
-                                        }
+                                        update_king_square = Some(updating_move.to_square)
                                     }
                                 }
                             }
@@ -1256,14 +1264,20 @@ pub(crate) mod chess {
                         ChessMove::CastlingMove(castling_move) => {
                             self.set_ep_square(None);
                             self.set_castling(self.get_color(), [None, None]);
-                            match self.get_color() {
-                                EnumColor::White => self.set_w_king_square(castling_move.king_to),
-                                EnumColor::Black => self.set_b_king_square(castling_move.king_to),
-                            }
+                            update_king_square = Some(castling_move.king_to);
                         },
                         _ => self.set_ep_square(None),
                     }
                     self.frozen_make_move(possible_move);
+                    match update_king_square {
+                        None => {},
+                        Some(new_square) => {
+                            match self.get_color() {
+                                EnumColor::White => self.set_w_king_square(new_square),
+                                EnumColor::Black => self.set_b_king_square(new_square),
+                            }
+                        },
+                    }
                     self.set_color(self.get_opposite_color());
                 }
             }
@@ -1932,12 +1946,12 @@ pub(crate) mod chess {
                 }
             }
 
-            struct StandardSquare {
+            pub(crate) struct StandardSquare {
                 rank: EnumRank,
                 file: EnumFile,
             }
 
-            fn standardize<SquareRep: Squarey> (square: SquareRep) -> StandardSquare {
+            pub(crate) fn standardize<SquareRep: Squarey> (square: SquareRep) -> StandardSquare {
                 StandardSquare {
                     rank: square.get_rank(),
                     file: square.get_file(),
@@ -2056,7 +2070,7 @@ pub(crate) mod chess {
 fn main() {
     use chess::{abstracts::helper_traits::*, implementations::impls_v0::*};
     // println!("Start position: {:?}", STARTPOS);
-    println!("Valid starting moves: {:?}", STARTPOS.get_legal_proper_moves().len());
+    // println!("Valid starting moves: {:?}", STARTPOS.get_legal_proper_moves().len());
 
     // println!("Valid starting moves are: ");
     // for chess_move in STARTPOS.get_legal_proper_moves() {
@@ -2068,6 +2082,8 @@ fn main() {
 
     let trying_startpos_perft = false;
     let first_test = false;
+    let second_test = false;
+    let third_test = true;
 
     if trying_startpos_perft {
         println!("Perft from STARTPOS:");
@@ -2076,7 +2092,7 @@ fn main() {
         for (move_made, successors_num) in sub_perfts {
             println!("{0} - {1}", move_made, successors_num)
         }
-        
+
         // println!("First offender:");
         // for (move_made, successors_num) in depth_n_better_perft(STARTPOS, 2) {
         //     if successors_num > 20 {
@@ -2091,7 +2107,7 @@ fn main() {
         // }
     
         // Initial problem was that en passant squares were being created on the wrong side of the board. 
-        // Thus A2A4 could be followed up by B2A3, taking on the now-empty A2 square.
+        // Thus A2A4 could be followed up by B7A6, taking on the now-empty A2 square.
     } else if first_test {
         let mut curr_pos = STARTPOS;
         curr_pos.make_move(
@@ -2120,8 +2136,9 @@ fn main() {
         // Problem was that en passant squares were sticking around for more than one ply, so after A2A4 and A7A6, 
         // white could capture their own pawn via en passant per B2A3. The ep-resetting thing was missing from 
         // the StandardMove branch.
-    } else {
+    } else if second_test {
         let mut curr_pos = STARTPOS;
+        println!("Startpos initialized");
         curr_pos.make_move(
             ChessMove::StandardMove(
                 StandardMove {
@@ -2130,6 +2147,7 @@ fn main() {
                 }
             )
         );
+        println!("First move made, B1C3");
         curr_pos.make_move(
             ChessMove::StandardMove(
                 StandardMove {
@@ -2138,11 +2156,67 @@ fn main() {
                 }
             )
         );
+        println!("Second move made, E7E6");
         curr_pos.make_move(
             ChessMove::StandardMove(
                 StandardMove {
                     from_square: <i8 as Squarey>::build_square(EnumRank::Three, EnumFile::C), 
                     to_square: <i8 as Squarey>::build_square(EnumRank::Five, EnumFile::D),
+                }
+            )
+        );
+        println!("Third move made, C3D5");
+        println!("Perft from this, the offending position:");
+        let (total_num, sub_perfts) = depth_n_better_perft(curr_pos, 1);
+        println!("Total: {}", total_num);
+        for (move_made, successors_num) in sub_perfts {
+            println!("{0} - {1}", move_made, successors_num)
+        }
+        println!("Legality check: {}", curr_pos.check_remaining_legality(
+            ChessMove::StandardMove(
+                StandardMove {
+                    from_square: <i8 as Squarey>::build_square(EnumRank::Eight, EnumFile::E), 
+                    to_square: <i8 as Squarey>::build_square(EnumRank::Seven, EnumFile::E),
+                }
+            )
+        ));
+        curr_pos.make_move(
+            ChessMove::StandardMove(
+                StandardMove {
+                    from_square: <i8 as Squarey>::build_square(EnumRank::Eight, EnumFile::E), 
+                    to_square: <i8 as Squarey>::build_square(EnumRank::Seven, EnumFile::E),
+                }
+            )
+        );
+        println!("Fourth (problem) move made.");
+        println!("Black king square: {}", standardize(curr_pos.get_b_king_square()).to_string())
+        // The extra problem move is E8E7, which would be the black king going into check.
+
+        // The reason for this problem was that I was checking for attacking knights at a 
+        // king's move away from the target square, not a knight's move away.
+    } else if third_test {
+        let mut curr_pos = STARTPOS;
+        curr_pos.make_move(
+            ChessMove::StandardMove(
+                StandardMove {
+                    from_square: <i8 as Squarey>::build_square(EnumRank::Two, EnumFile::C), 
+                    to_square: <i8 as Squarey>::build_square(EnumRank::Three, EnumFile::C),
+                }
+            )
+        );
+        curr_pos.make_move(
+            ChessMove::StandardMove(
+                StandardMove {
+                    from_square: <i8 as Squarey>::build_square(EnumRank::Seven, EnumFile::B), 
+                    to_square: <i8 as Squarey>::build_square(EnumRank::Five, EnumFile::B),
+                }
+            )
+        );
+        curr_pos.make_move(
+            ChessMove::StandardMove(
+                StandardMove {
+                    from_square: <i8 as Squarey>::build_square(EnumRank::One, EnumFile::D), 
+                    to_square: <i8 as Squarey>::build_square(EnumRank::Four, EnumFile::A),
                 }
             )
         );
@@ -2152,6 +2226,9 @@ fn main() {
         for (move_made, successors_num) in sub_perfts {
             println!("{0} - {1}", move_made, successors_num)
         }
-        // The extra problem move is E8E7, which would be the black king going into check.
+        
+        // In this position, the pawn on B5 flasely claims to have no legal moves. Presumably this is a bug both: 
+        // 1) with pin-checking logic, where the pin-checker misses the D7 pawn,
+        // 2) with pin-checking logic, where pieces are falsely disallowed from taking the attackers that put them into pins.
     }
 }
