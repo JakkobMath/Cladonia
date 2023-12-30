@@ -1,3 +1,5 @@
+use crate::chess::abstracts::helper_types::{StandardMove, ChessMove, EnumRank, EnumFile};
+
 pub(crate) mod chess {
     pub(crate) mod abstracts {
         pub(crate)  mod helper_types {
@@ -354,30 +356,33 @@ pub(crate) mod chess {
                 fn get_bishop_rays(&self) -> Vec<Ray<Self, (SmallOffset, SmallOffset)>> {
                     let mut rays = Vec::new();
                     for direction in BISHOP_DIRECTIONS {
-                        match self.try_get_offset_square(direction.0, direction.1) {
-                            None => {},
-                            Some(offset_square) => rays.push(Ray {curr_pos: offset_square, direction: direction})
-                        }
+                        // match self.try_get_offset_square(direction.0, direction.1) {
+                        //     None => {},
+                        //     Some(offset_square) => rays.push(Ray {curr_pos: offset_square, direction: direction})
+                        // }
+                        rays.push(Ray {curr_pos: *self, direction: direction});
                     }
                     rays
                 }
                 fn get_rook_rays(&self) -> Vec<Ray<Self, (SmallOffset, SmallOffset)>>{
                     let mut rays = Vec::new();
                     for direction in ROOK_DIRECTIONS {
-                        match self.try_get_offset_square(direction.0, direction.1) {
-                            None => {},
-                            Some(offset_square) => rays.push(Ray {curr_pos: offset_square, direction: direction})
-                        }
+                        // match self.try_get_offset_square(direction.0, direction.1) {
+                        //     None => {},
+                        //     Some(offset_square) => rays.push(Ray {curr_pos: offset_square, direction: direction})
+                        // }
+                        rays.push(Ray {curr_pos: *self, direction: direction});
                     }
                     rays
                 }
                 fn get_queen_rays(&self) -> Vec<Ray<Self, (SmallOffset, SmallOffset)>>{
                     let mut rays = Vec::new();
                     for direction in QUEEN_DIRECTIONS {
-                        match self.try_get_offset_square(direction.0, direction.1) {
-                            None => {},
-                            Some(offset_square) => rays.push(Ray {curr_pos: offset_square, direction: direction})
-                        }
+                        // match self.try_get_offset_square(direction.0, direction.1) {
+                        //     None => {},
+                        //     Some(offset_square) => rays.push(Ray {curr_pos: offset_square, direction: direction})
+                        // }
+                        rays.push(Ray {curr_pos: *self, direction: direction});
                     }
                     rays
                 }
@@ -746,10 +751,10 @@ pub(crate) mod chess {
                     self.sees_obvious_attack(self.get_opposite_color(), relevant_king_square)
                 }
                 fn is_stalemate(&self) -> bool {
-                    self.get_legal_improper_moves().len() == 1 && !self.mover_in_check()
+                    self.get_legal_proper_moves().len() == 1 && !self.mover_in_check()
                 }
                 fn is_checkmate(&self) -> bool {
-                    self.get_legal_improper_moves().len() == 0
+                    self.get_legal_proper_moves().len() == 0
                 }
 
                 fn is_pinned(&self, square: Self::PositionRep) -> bool {
@@ -994,7 +999,7 @@ pub(crate) mod chess {
                                                         to_square: attacked_square })))
                                     };
                                     break;
-                                }
+                                },
                             }
                         }
                     }
@@ -1154,7 +1159,7 @@ pub(crate) mod chess {
                     }
                     castling_moves
                 }
-                fn get_pseudo_legal_improper_moves(&self) -> Vec<Self::MoveRep> {
+                fn get_pseudo_legal_proper_moves(&self) -> Vec<Self::MoveRep> {
                     let mut probable_moves = Vec::new();
                     for square in Self::CANONICAL_ARRAY {
                         match self.query_square(square).get_contents() {
@@ -1190,9 +1195,9 @@ pub(crate) mod chess {
                     probable_moves
                 }
                 
-                fn get_legal_improper_moves(&self) -> Vec<Self::MoveRep> {
+                fn get_legal_proper_moves(&self) -> Vec<Self::MoveRep> {
                     let mut legal_moves = Vec::new();
-                    for possible_move in self.get_pseudo_legal_improper_moves() {
+                    for possible_move in self.get_pseudo_legal_proper_moves() {
                         if self.check_remaining_legality(possible_move) {
                             legal_moves.push(possible_move)
                         }
@@ -1232,10 +1237,12 @@ pub(crate) mod chess {
                                 Some(piece) => {
                                     if updating_move.from_square.rank_gap(&updating_move.to_square).abs() == 2 && piece.get_piece_type() == EnumPiecesUncolored::Pawn {
                                         let midpoint_square = match self.get_color() {
-                                            EnumColor::White => Self::PositionRep::build_square(EnumRank::Six, updating_move.from_square.get_file()),
-                                            EnumColor::Black => Self::PositionRep::build_square(EnumRank::Three, updating_move.from_square.get_file()),
+                                            EnumColor::White => Self::PositionRep::build_square(EnumRank::Three, updating_move.from_square.get_file()),
+                                            EnumColor::Black => Self::PositionRep::build_square(EnumRank::Six, updating_move.from_square.get_file()),
                                         };
                                         self.set_ep_square(Some((updating_move.to_square, midpoint_square)))
+                                    } else {
+                                        self.set_ep_square(None)
                                     }
                                     if piece.get_piece_type() == EnumPiecesUncolored::King {
                                         match piece.get_color() {
@@ -1536,20 +1543,21 @@ pub(crate) mod chess {
         use super::abstracts::{helper_traits::*, helper_types::*};
 
         pub(crate) mod impls_v0 {
+
             use super::*;
             // Colored for i8.
             // Pairing 0 and 1 together, 2 and 3, and so forth. Last bit is color info.
             impl Colored for i8 {
                 fn get_color(&self) -> crate::chess::abstracts::helper_types::EnumColor {
-                    match self % 2 {
-                        0 => EnumColor::White,
+                    match self % 2i8 {
+                        0i8 => EnumColor::White,
                         _ => EnumColor::Black,
                     }
                 }
                 fn set_color(&mut self, color: EnumColor) -> () {
-                    *self = 2 * (*self / 2) + match color {
-                        EnumColor::White => 0,
-                        EnumColor::Black => 1,
+                    *self = 2i8 * (*self / 2i8) + match color {
+                        EnumColor::White => 0i8,
+                        EnumColor::Black => 1i8,
                     }
                 }
             }
@@ -1557,26 +1565,26 @@ pub(crate) mod chess {
             // Piecey for i8.
             impl Piecey for i8 {
                 fn get_piece_type(&self) -> EnumPiecesUncolored {
-                    match self / 2 {
-                        0 => EnumPiecesUncolored::Pawn,
-                        1 => EnumPiecesUncolored::Knight,
-                        2 => EnumPiecesUncolored::Bishop,
-                        3 => EnumPiecesUncolored::Rook,
-                        4 => EnumPiecesUncolored::Queen,
+                    match self / 2i8 {
+                        0i8 => EnumPiecesUncolored::Pawn,
+                        1i8 => EnumPiecesUncolored::Knight,
+                        2i8 => EnumPiecesUncolored::Bishop,
+                        3i8 => EnumPiecesUncolored::Rook,
+                        4i8 => EnumPiecesUncolored::Queen,
                         _ => EnumPiecesUncolored::King,
                     }
                 }
                 fn build_piece(piece_color: EnumColor, piece_type: EnumPiecesUncolored) -> Self {
-                    2 * match piece_type {
-                        EnumPiecesUncolored::Pawn => 0,
-                        EnumPiecesUncolored::Knight => 1,
-                        EnumPiecesUncolored::Bishop => 2,
-                        EnumPiecesUncolored::Rook => 3,
-                        EnumPiecesUncolored::Queen => 4,
-                        EnumPiecesUncolored::King => 5,
+                    2i8 * match piece_type {
+                        EnumPiecesUncolored::Pawn => 0i8,
+                        EnumPiecesUncolored::Knight => 1i8,
+                        EnumPiecesUncolored::Bishop => 2i8,
+                        EnumPiecesUncolored::Rook => 3i8,
+                        EnumPiecesUncolored::Queen => 4i8,
+                        EnumPiecesUncolored::King => 5i8,
                     } + match piece_color {
-                        EnumColor::White => 0,
-                        EnumColor::Black => 1,
+                        EnumColor::White => 0i8,
+                        EnumColor::Black => 1i8,
                     }
                 }
             }
@@ -1585,14 +1593,14 @@ pub(crate) mod chess {
             impl Contentsy for i8 {
                 type Content = i8;
                 fn get_contents(&self) -> Option<Self::Content> {
-                    match *self < 0 {
+                    match *self < 0i8 {
                         true => None,
                         false => Some(*self),
                     }
                 }
                 fn build_contents(contents: Option<Self::Content>) -> Self {
                     match contents {
-                        None => -1,
+                        None => -1i8,
                         Some(value) => value,
                     }
                 }
@@ -1893,12 +1901,257 @@ pub(crate) mod chess {
                 w_king_square: 4,
                 b_king_square: 56 + 4,
             };
+
+            impl ToString for EnumRank {
+                fn to_string(&self) -> String {
+                    match *self {
+                        EnumRank::One => (*"1").to_string(),
+                        EnumRank::Two => (*"2").to_string(),
+                        EnumRank::Three => (*"3").to_string(),
+                        EnumRank::Four => (*"4").to_string(),
+                        EnumRank::Five => (*"5").to_string(),
+                        EnumRank::Six => (*"6").to_string(),
+                        EnumRank::Seven => (*"7").to_string(),
+                        EnumRank::Eight => (*"8").to_string(),
+                    }
+                }
+            }
+
+            impl ToString for EnumFile {
+                fn to_string(&self) -> String {
+                    match *self {
+                        EnumFile::A => (*"A").to_string(),
+                        EnumFile::B => (*"B").to_string(),
+                        EnumFile::C => (*"C").to_string(),
+                        EnumFile::D => (*"D").to_string(),
+                        EnumFile::E => (*"E").to_string(),
+                        EnumFile::F => (*"F").to_string(),
+                        EnumFile::G => (*"G").to_string(),
+                        EnumFile::H => (*"H").to_string(),
+                    }
+                }
+            }
+
+            struct StandardSquare {
+                rank: EnumRank,
+                file: EnumFile,
+            }
+
+            fn standardize<SquareRep: Squarey> (square: SquareRep) -> StandardSquare {
+                StandardSquare {
+                    rank: square.get_rank(),
+                    file: square.get_file(),
+                }
+            }
+
+            impl ToString for StandardSquare {
+                fn to_string(&self) -> String {
+                    let rank_string = self.rank.to_string();
+                    let mut square_string = self.file.to_string();
+                    square_string.push_str(&rank_string);
+                    square_string
+                }
+            }
+
+            impl ToString for EnumPiecesUncolored {
+                fn to_string(&self) -> String {
+                    match *self {
+                        Self::Pawn => (*"").to_string(),
+                        Self::Knight => (*"N").to_string(),
+                        Self::Bishop => (*"B").to_string(),
+                        Self::Rook => (*"R").to_string(),
+                        Self::Queen => (*"Q").to_string(),
+                        Self::King => (*"K").to_string(),
+                    }
+                }
+            }
+
+            impl std::fmt::Display for ChessMove<i8, i8> {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    let (start_sq, end_sq) = match *self {
+                        Self::NullMove => {
+                            ("00".to_string(), "00".to_string())
+                        },
+                        Self::StandardMove(some_move) => {
+                            (standardize(some_move.from_square).to_string(), standardize(some_move.to_square).to_string())
+                        },
+                        Self::EnPassantMove(some_move) => {
+                            (standardize(some_move.from_square).to_string(), standardize(some_move.to_square).to_string())
+                        },
+                        Self::CastlingMove(some_move) => {
+                            (standardize(some_move.king_from).to_string(), standardize(some_move.king_to).to_string())
+                        },
+                        Self::PromotionMove(some_move) => {
+                            (standardize(some_move.from_square).to_string(), standardize(some_move.to_square).to_string())
+                        },
+                    };
+                    match write!(f, "{}", start_sq) {
+                        Ok(_val) => {},
+                        Err(error) => return Result::Err(error)
+                    };
+                    match write!(f, "{}", end_sq) {
+                        Ok(_val) => {},
+                        Err(error) => return Result::Err(error)
+                    };
+                    match *self {
+                        Self::PromotionMove(some_move) => {
+                            write!(f, "={}", some_move.promotion_choice.get_piece_type().to_string())
+                        },
+                        _ => {
+                            Result::Ok(())
+                        },
+                    }
+                }
+            }
+
+            fn legal_successor_positions(fen: UnwrappedFen) -> Vec<UnwrappedFen> {
+                let mut successors = Vec::new();
+                for legal_move in fen.get_legal_proper_moves() {
+                    let mut changed_pos = fen;
+                    changed_pos.make_move(legal_move);
+                    successors.push(changed_pos)
+                }
+                successors
+            }
+
+            pub(crate) fn depth_n_total_perft(fen: UnwrappedFen, mut n: i8) -> usize {
+                let mut curr_list = Vec::new();
+                curr_list.push(fen);
+                while n > 1 {
+                    let mut new_list = Vec::new();
+                    for old_fen in curr_list {
+                        new_list.append(&mut legal_successor_positions(old_fen))
+                    }
+                    curr_list = new_list;
+                    n -= 1;
+                }
+                if n == 1 {
+                    let mut total = 0;
+                    for old_fen in curr_list {
+                        let addition = old_fen.get_legal_proper_moves().len();
+                        total += addition
+                    }
+                    return total
+                } 
+                1
+            }
+
+            pub(crate) fn depth_n_better_perft(fen: UnwrappedFen, n: i8) -> (usize, Vec<(ChessMove<i8, i8>, usize)>) {
+                let mut sub_perfts = Vec::new();
+                let mut grand_total = 0;
+                for legal_move in fen.get_legal_proper_moves() {
+                    let mut possible_successor = fen;
+                    possible_successor.make_move(legal_move);
+
+                    let successors_here = depth_n_total_perft(possible_successor, n-1);
+                    sub_perfts.push((legal_move, successors_here));
+                    grand_total += successors_here;
+                }
+                (grand_total, sub_perfts)
+            }
         }
     }
 }
 
 fn main() {
     use chess::{abstracts::helper_traits::*, implementations::impls_v0::*};
-    println!("Start position: {:?}", STARTPOS);
-    println!("Valid starting moves: {:?}", STARTPOS.get_legal_improper_moves().len());
+    // println!("Start position: {:?}", STARTPOS);
+    println!("Valid starting moves: {:?}", STARTPOS.get_legal_proper_moves().len());
+
+    // println!("Valid starting moves are: ");
+    // for chess_move in STARTPOS.get_legal_proper_moves() {
+    //     println!("{}", chess_move);
+    // }
+    // println!("Depth 0: {}", depth_n_perft(STARTPOS, 0));
+    // println!("Depth 1: {}", depth_n_perft(STARTPOS, 1));
+    // println!("Depth 2: {}", depth_n_perft(STARTPOS, 2));
+
+    let trying_startpos_perft = false;
+    let first_test = false;
+
+    if trying_startpos_perft {
+        println!("Perft from STARTPOS:");
+        let (total_num, sub_perfts) = depth_n_better_perft(STARTPOS, 4);
+        println!("Total: {}", total_num);
+        for (move_made, successors_num) in sub_perfts {
+            println!("{0} - {1}", move_made, successors_num)
+        }
+        
+        // println!("First offender:");
+        // for (move_made, successors_num) in depth_n_better_perft(STARTPOS, 2) {
+        //     if successors_num > 20 {
+        //         println!("White's move: {}", move_made);
+        //         let mut new_pos = STARTPOS;
+        //         new_pos.make_move(move_made);
+        //         for chess_move in new_pos.get_legal_proper_moves() {
+        //             println!("{}", chess_move)
+        //         }
+        //         break;
+        //     }
+        // }
+    
+        // Initial problem was that en passant squares were being created on the wrong side of the board. 
+        // Thus A2A4 could be followed up by B2A3, taking on the now-empty A2 square.
+    } else if first_test {
+        let mut curr_pos = STARTPOS;
+        curr_pos.make_move(
+            ChessMove::StandardMove(
+                StandardMove {
+                    from_square: <i8 as Squarey>::build_square(EnumRank::Two, EnumFile::A), 
+                    to_square: <i8 as Squarey>::build_square(EnumRank::Four, EnumFile::A),
+                }
+            )
+        );
+        curr_pos.make_move(
+            ChessMove::StandardMove(
+                StandardMove {
+                    from_square: <i8 as Squarey>::build_square(EnumRank::Seven, EnumFile::A), 
+                    to_square: <i8 as Squarey>::build_square(EnumRank::Six, EnumFile::A),
+                }
+            )
+        );
+        println!("Perft from offender:");
+        let (total_num, sub_perfts) = depth_n_better_perft(curr_pos, 1);
+        println!("Total: {}", total_num);
+        for (move_made, successors_num) in sub_perfts {
+            println!("{0} - {1}", move_made, successors_num)
+        }
+
+        // Problem was that en passant squares were sticking around for more than one ply, so after A2A4 and A7A6, 
+        // white could capture their own pawn via en passant per B2A3. The ep-resetting thing was missing from 
+        // the StandardMove branch.
+    } else {
+        let mut curr_pos = STARTPOS;
+        curr_pos.make_move(
+            ChessMove::StandardMove(
+                StandardMove {
+                    from_square: <i8 as Squarey>::build_square(EnumRank::One, EnumFile::B), 
+                    to_square: <i8 as Squarey>::build_square(EnumRank::Three, EnumFile::C),
+                }
+            )
+        );
+        curr_pos.make_move(
+            ChessMove::StandardMove(
+                StandardMove {
+                    from_square: <i8 as Squarey>::build_square(EnumRank::Seven, EnumFile::E), 
+                    to_square: <i8 as Squarey>::build_square(EnumRank::Six, EnumFile::E),
+                }
+            )
+        );
+        curr_pos.make_move(
+            ChessMove::StandardMove(
+                StandardMove {
+                    from_square: <i8 as Squarey>::build_square(EnumRank::Three, EnumFile::C), 
+                    to_square: <i8 as Squarey>::build_square(EnumRank::Five, EnumFile::D),
+                }
+            )
+        );
+        println!("Perft from offender:");
+        let (total_num, sub_perfts) = depth_n_better_perft(curr_pos, 1);
+        println!("Total: {}", total_num);
+        for (move_made, successors_num) in sub_perfts {
+            println!("{0} - {1}", move_made, successors_num)
+        }
+        // The extra problem move is E8E7, which would be the black king going into check.
+    }
 }
