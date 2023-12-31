@@ -357,10 +357,6 @@ pub(crate) mod chess {
                 fn get_bishop_rays(&self) -> Vec<Ray<Self, (SmallOffset, SmallOffset)>> {
                     let mut rays = Vec::new();
                     for direction in BISHOP_DIRECTIONS {
-                        // match self.try_get_offset_square(direction.0, direction.1) {
-                        //     None => {},
-                        //     Some(offset_square) => rays.push(Ray {curr_pos: offset_square, direction: direction})
-                        // }
                         rays.push(Ray {curr_pos: *self, direction: direction});
                     }
                     rays
@@ -368,10 +364,6 @@ pub(crate) mod chess {
                 fn get_rook_rays(&self) -> Vec<Ray<Self, (SmallOffset, SmallOffset)>>{
                     let mut rays = Vec::new();
                     for direction in ROOK_DIRECTIONS {
-                        // match self.try_get_offset_square(direction.0, direction.1) {
-                        //     None => {},
-                        //     Some(offset_square) => rays.push(Ray {curr_pos: offset_square, direction: direction})
-                        // }
                         rays.push(Ray {curr_pos: *self, direction: direction});
                     }
                     rays
@@ -379,10 +371,6 @@ pub(crate) mod chess {
                 fn get_queen_rays(&self) -> Vec<Ray<Self, (SmallOffset, SmallOffset)>>{
                     let mut rays = Vec::new();
                     for direction in QUEEN_DIRECTIONS {
-                        // match self.try_get_offset_square(direction.0, direction.1) {
-                        //     None => {},
-                        //     Some(offset_square) => rays.push(Ray {curr_pos: offset_square, direction: direction})
-                        // }
                         rays.push(Ray {curr_pos: *self, direction: direction});
                     }
                     rays
@@ -414,13 +402,13 @@ pub(crate) mod chess {
                 fn set_square(&mut self, square: Self::PositionRep, new_contents: Self::ContentsRep) -> ();
                 fn sees_obvious_attack(&self, defending_color: EnumColor, square: Self::PositionRep) -> bool {
 
-                    let opponent_pawn_move_dir = match defending_color {
-                        EnumColor::White => SmallOffset::MinusOne,
-                        EnumColor::Black => SmallOffset::PlusOne,
+                    let reverse_opponent_pawn_move_dir = match defending_color {
+                        EnumColor::White => SmallOffset::PlusOne,
+                        EnumColor::Black => SmallOffset::MinusOne,
                     };
 
                     for file_movement in [SmallOffset::MinusOne, SmallOffset::PlusOne] {
-                        match square.try_get_offset_square(opponent_pawn_move_dir, file_movement) {
+                        match square.try_get_offset_square(reverse_opponent_pawn_move_dir, file_movement) {
                             None => {},
                             Some(possibly_attacking_square) => {
                                 match self.query_square(possibly_attacking_square).get_contents() {
@@ -442,8 +430,6 @@ pub(crate) mod chess {
                     }
 
                     for knight_square in square.get_knight_offset_squares() {
-                        // let readable_square = standardize(knight_square);
-                        // println!("Checking knight move square: {}", readable_square.to_string());
                         match self.query_square(knight_square).get_contents() {
                             None => {},
                             Some(piece) => {
@@ -617,37 +603,6 @@ pub(crate) mod chess {
 
                     attacking_moves
                 }
-
-                // fn get_raw_knight_moves(&self, square: Self::PositionRep) -> Vec<Self::MoveRep> {
-                //     let mut knight_moves = Vec::new();
-                //     for knight_offset in KNIGHT_OFFSETS {
-                //         match square.try_get_offset_square(knight_offset.0, knight_offset.1) {
-                //             None => {},
-                //             Some(new_square) => knight_moves.push(
-                //                 Self::MoveRep::build_move(
-                //                     ChessMove::StandardMove(
-                //                         StandardMove {
-                //                             from_square: square,
-                //                             to_square: new_square,})))
-                //         }
-                //     }
-                //     knight_moves
-                // }
-                // fn get_raw_king_moves(&self, square: Self::PositionRep) -> Vec<Self::MoveRep> {
-                //     let mut king_moves = Vec::new();
-                //     for king_offset in PROPER_KING_OFFSETS {
-                //         match square.try_get_offset_square(king_offset.0, king_offset.1) {
-                //             None => {},
-                //             Some(new_square) => king_moves.push(
-                //                 Self::MoveRep::build_move(
-                //                     ChessMove::StandardMove(
-                //                         StandardMove {
-                //                             from_square: square,
-                //                             to_square: new_square,})))
-                //         }
-                //     }
-                //     king_moves
-                // }
                 
                 fn after_frozen_move(&self, possible_move: Self::MoveRep) -> Self {
                     let mut after_pos = *self;
@@ -766,7 +721,7 @@ pub(crate) mod chess {
                         EnumColor::White => self.get_w_king_square(),
                         EnumColor::Black => self.get_b_king_square(),
                     };
-                    match square.try_get_ray_away(king_square) {
+                    match king_square.try_get_ray_to(square) {
                         None => false,
                         Some(ray) => {
                             let ray_piece_type = match ray.direction.0 == SmallOffset::Stay || ray.direction.1 == SmallOffset::Stay {
@@ -778,57 +733,49 @@ pub(crate) mod chess {
                                     None => {},
                                     Some(piece) => {
                                         if piece.get_color() == self.get_opposite_color() && (piece.get_piece_type() == EnumPiecesUncolored::Queen || piece.get_piece_type() == ray_piece_type) {
-                                            return true;
+                                            return true
                                         }
-                                        break;
-                                    }
+                                        if threatening_square != square {
+                                            break
+                                        }
+                                    },
                                 }
                             }
                             false
-                        }
+                        },
+                    }
+                }
+                fn pinning_square(&self, square: Self::PositionRep) -> Option<Self::PositionRep> {
+                    let king_square = match self.get_color() {
+                        EnumColor::White => self.get_w_king_square(),
+                        EnumColor::Black => self.get_b_king_square(),
+                    };
+                    match king_square.try_get_ray_to(square) {
+                        None => None,
+                        Some(ray) => {
+                            let ray_piece_type = match ray.direction.0 == SmallOffset::Stay || ray.direction.1 == SmallOffset::Stay {
+                                true => EnumPiecesUncolored::Rook,
+                                false => EnumPiecesUncolored::Bishop,
+                            };
+                            for threatening_square in ray {
+                                match self.query_square(threatening_square).get_contents() {
+                                    None => {},
+                                    Some(piece) => {
+                                        if piece.get_color() == self.get_opposite_color() && (piece.get_piece_type() == EnumPiecesUncolored::Queen || piece.get_piece_type() == ray_piece_type) {
+                                            return Some(threatening_square)
+                                        }
+                                        if threatening_square != square {
+                                            break
+                                        }
+                                    },
+                                }
+                            }
+                            None
+                        },
                     }
                 }
                 fn check_remaining_legality(&self, possible_move: Self::MoveRep) -> bool {
                     match possible_move.get_move() {
-                        ChessMove::NullMove => true,
-                        ChessMove::StandardMove(proposed_move) => {
-                            // Do the faster check first.
-                            if self.is_pinned(proposed_move.from_square) {
-                                return false
-                            } else /*if !self.mover_in_check() {
-                                return true
-                            } else*/ {
-                                // If the fast check fails, do the full check. 
-                                // This is probably useless because of cache stuff, but bitboards make
-                                // optimizing this version of movegen beyond ``workable" a waste of time imo.
-                                // let is_legal = ! ((self.after_move(possible_move)).non_mover_in_check());
-                                // return is_legal
-                                return !self.after_move(possible_move).non_mover_in_check()
-                            }
-                        },
-                        ChessMove::PromotionMove(proposed_move) => {
-                            if self.is_pinned(proposed_move.from_square) {
-                                return false
-                            } else if !self.mover_in_check() {
-                                return true
-                            } else {
-                                return !self.after_move(possible_move).non_mover_in_check()
-                            }
-                        },
-                        ChessMove::EnPassantMove(proposed_move) => {
-                            // The captured piece also disappears, but we don't have to check whether it's pinned because if it was then
-                            // moving it into place the previous ply would have blocked an attack on the now-moving king. This entails
-                            // that said king would have been in check while it was the opponent's turn, which is illegal. The only kind
-                            // of attack that would be blocked by both the pre-moved opponent pawn and the now-moved pawn is a rook-style
-                            // ray along a file... which will now be blocked by the pawn that did en passant.
-                            if self.is_pinned(proposed_move.from_square) {
-                                return false
-                            } else if !self.mover_in_check() {
-                                return true
-                            } else {
-                                return !self.after_move(possible_move).non_mover_in_check()
-                            }
-                        },
                         ChessMove::CastlingMove(proposed_move) => {
                             if self.mover_in_check() {
                                 return false
@@ -850,6 +797,7 @@ pub(crate) mod chess {
                                 }
                             }
                         },
+                        _ => {return !self.after_move(possible_move).non_mover_in_check()},
                     }
                 }
                 fn is_forward_progress(&self, possible_move: Self::MoveRep) -> bool {
@@ -1865,14 +1813,6 @@ pub(crate) mod chess {
 
             pub(crate) const STARTPOS: UnwrappedFen = UnwrappedFen {
                 board: [
-                    //  6, 0, -1, -1, -1, -1, 1,  7, 
-                    //  2, 0, -1, -1, -1, -1, 1,  3, 
-                    //  4, 0, -1, -1, -1, -1, 1,  5, 
-                    //  8, 0, -1, -1, -1, -1, 1,  9, 
-                    // 10, 0, -1, -1, -1, -1, 1, 11, 
-                    //  4, 0, -1, -1, -1, -1, 1,  5, 
-                    //  2, 0, -1, -1, -1, -1, 1,  3, 
-                    //  6, 0, -1, -1, -1, -1, 1,  7, 
                      6,  2,  4,  8, 10,  4,  2,  6, 
                      0,  0,  0,  0,  0,  0,  0,  0, 
                     -1, -1, -1, -1, -1, -1, -1, -1, 
@@ -2069,42 +2009,20 @@ pub(crate) mod chess {
 
 fn main() {
     use chess::{abstracts::helper_traits::*, implementations::impls_v0::*};
-    // println!("Start position: {:?}", STARTPOS);
-    // println!("Valid starting moves: {:?}", STARTPOS.get_legal_proper_moves().len());
 
-    // println!("Valid starting moves are: ");
-    // for chess_move in STARTPOS.get_legal_proper_moves() {
-    //     println!("{}", chess_move);
-    // }
-    // println!("Depth 0: {}", depth_n_perft(STARTPOS, 0));
-    // println!("Depth 1: {}", depth_n_perft(STARTPOS, 1));
-    // println!("Depth 2: {}", depth_n_perft(STARTPOS, 2));
-
-    let trying_startpos_perft = false;
+    let trying_startpos_perft = true;
     let first_test = false;
     let second_test = false;
-    let third_test = true;
+    let third_test = false;
+    let fourth_test = true;
 
     if trying_startpos_perft {
         println!("Perft from STARTPOS:");
-        let (total_num, sub_perfts) = depth_n_better_perft(STARTPOS, 4);
+        let (total_num, sub_perfts) = depth_n_better_perft(STARTPOS, 5);
         println!("Total: {}", total_num);
         for (move_made, successors_num) in sub_perfts {
             println!("{0} - {1}", move_made, successors_num)
         }
-
-        // println!("First offender:");
-        // for (move_made, successors_num) in depth_n_better_perft(STARTPOS, 2) {
-        //     if successors_num > 20 {
-        //         println!("White's move: {}", move_made);
-        //         let mut new_pos = STARTPOS;
-        //         new_pos.make_move(move_made);
-        //         for chess_move in new_pos.get_legal_proper_moves() {
-        //             println!("{}", chess_move)
-        //         }
-        //         break;
-        //     }
-        // }
     
         // Initial problem was that en passant squares were being created on the wrong side of the board. 
         // Thus A2A4 could be followed up by B7A6, taking on the now-empty A2 square.
@@ -2230,5 +2148,58 @@ fn main() {
         // In this position, the pawn on B5 flasely claims to have no legal moves. Presumably this is a bug both: 
         // 1) with pin-checking logic, where the pin-checker misses the D7 pawn,
         // 2) with pin-checking logic, where pieces are falsely disallowed from taking the attackers that put them into pins.
+
+        // Fixed: stopped trying to do fancy stuff with pins, the logic was hard to work out. 
+        // That's an optimization for later, and should be tested in case cache witchcraft makes it slow.
+        // Perft now correct to depth 4.
+    } else if fourth_test {
+        let mut curr_pos = STARTPOS;
+        curr_pos.make_move(
+            ChessMove::StandardMove(
+                StandardMove {
+                    from_square: <i8 as Squarey>::build_square(EnumRank::Two, EnumFile::D), 
+                    to_square: <i8 as Squarey>::build_square(EnumRank::Three, EnumFile::D),
+                }
+            )
+        );
+        curr_pos.make_move(
+            ChessMove::StandardMove(
+                StandardMove {
+                    from_square: <i8 as Squarey>::build_square(EnumRank::Seven, EnumFile::B), 
+                    to_square: <i8 as Squarey>::build_square(EnumRank::Five, EnumFile::B),
+                }
+            )
+        );
+        curr_pos.make_move(
+            ChessMove::StandardMove(
+                StandardMove {
+                    from_square: <i8 as Squarey>::build_square(EnumRank::One, EnumFile::E), 
+                    to_square: <i8 as Squarey>::build_square(EnumRank::Two, EnumFile::D),
+                }
+            )
+        );
+        curr_pos.make_move(
+            ChessMove::StandardMove(
+                StandardMove {
+                    from_square: <i8 as Squarey>::build_square(EnumRank::Five, EnumFile::B), 
+                    to_square: <i8 as Squarey>::build_square(EnumRank::Four, EnumFile::B),
+                }
+            )
+        );
+        println!("Perft from offender:");
+        let (total_num, sub_perfts) = depth_n_better_perft(curr_pos, 1);
+        println!("Total: {}", total_num);
+        for (move_made, successors_num) in sub_perfts {
+            println!("{0} - {1}", move_made, successors_num)
+        }
+
+        // The problem is D2C3 in this position.
+
+        // The function sees_obvious_attack was checking for opponent pawns a *forward* opponent-pawn-attacking-move away
+        // from the square being checked. It now checks for opponent pawns *backwards* from the square being queried, so
+        // that detected pawns will actually be threatening the relevant square rather than one two squares behind it.
+
+        // Perft totals are now correct to depth 5. I haven't checked each of the 20 start move totals, but the first several
+        // at least should still be correct from when they were checked to find the line in this test.
     }
 }
