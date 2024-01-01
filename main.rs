@@ -1,5 +1,3 @@
-use crate::chess::abstracts::helper_types::{StandardMove, ChessMove, EnumRank, EnumFile, PromotionMove};
-
 pub(crate) mod chess {
     pub(crate) mod abstracts {
         pub(crate)  mod helper_types {
@@ -687,6 +685,20 @@ pub(crate) mod chess {
                     }
                     self.set_castling(self.get_color(), new_rules);
                 }
+                fn remove_enemy_castling(&mut self, removed_square: Self::PositionRep) -> () {
+                    let mut new_rules = self.get_castling(self.get_opposite_color());
+                    for i in [0, 1] {
+                        match new_rules[i] {
+                            None => {},
+                            Some(castling_move) => {
+                                if castling_move.rook_from == removed_square {
+                                    new_rules[i] = None;
+                                }
+                            }
+                        }
+                    }
+                    self.set_castling(self.get_opposite_color(), new_rules);
+                }
                 fn get_w_king_square(&self) -> Self::PositionRep;
                 fn set_w_king_square(&mut self, square: Self::PositionRep) -> ();
                 fn get_b_king_square(&self) -> Self::PositionRep;
@@ -1210,6 +1222,7 @@ pub(crate) mod chess {
                     match possible_move.get_move() {
                         ChessMove::StandardMove(updating_move) => {
                             self.remove_castling(updating_move.from_square);
+                            self.remove_enemy_castling(updating_move.to_square);
                             match self.query_square(updating_move.from_square).get_contents() {
                                 None => {},
                                 Some(piece) => {
@@ -1233,6 +1246,10 @@ pub(crate) mod chess {
                             self.set_castling(self.get_color(), [None, None]);
                             update_king_square = Some(castling_move.king_to);
                         },
+                        ChessMove::PromotionMove(promotion_move) => {
+                            self.set_ep_square(None);
+                            self.remove_enemy_castling(promotion_move.to_square);
+                        }
                         _ => self.set_ep_square(None),
                     }
                     self.frozen_make_move(possible_move);
@@ -2303,7 +2320,9 @@ fn main() {
 
     let kiwipete_string = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1".to_string();
     let trying_kiwipete_perft = true;
-    let first_test_pos_two = true;
+    let first_test_pos_two = false;
+    let second_test_pos_two = false;
+    let third_test_pos_two = true;
 
     if trying_startpos_perft {
         println!("Perft from STARTPOS:");
@@ -2562,6 +2581,106 @@ fn main() {
                 // The G2G1 promotion moves are not detected.
                 // ... But G2G1 (NOT promotion) IS constructed by pseudolegal movegen.
             },
+        }
+    } else if second_test_pos_two {
+        println!("Perft from Kiwipete:");
+        let try_kiwipete_pos = interpret_fen(kiwipete_string);
+        match try_kiwipete_pos {
+            Err(some_error) => println!("Error with parsing Kiwipete: {}", some_error),
+            Ok(kiwipete) => {
+                let mut curr_pos = kiwipete;
+                println!("Kiwipete initialized.");
+                curr_pos.make_move(
+                    ChessMove::StandardMove(
+                        StandardMove {
+                            from_square: <i8 as Squarey>::build_square(EnumRank::Five, EnumFile::E), 
+                            to_square: <i8 as Squarey>::build_square(EnumRank::Six, EnumFile::G),
+                        }
+                    )
+                );
+                println!("First move made, E5G6.");
+                curr_pos.make_move(
+                    ChessMove::StandardMove(
+                        StandardMove {
+                            from_square: <i8 as Squarey>::build_square(EnumRank::Three, EnumFile::H), 
+                            to_square: <i8 as Squarey>::build_square(EnumRank::Two, EnumFile::G),
+                        }
+                    )
+                );
+                println!("Second move made, H3G2.");
+                curr_pos.make_move(
+                    ChessMove::StandardMove(
+                        StandardMove {
+                            from_square: <i8 as Squarey>::build_square(EnumRank::Six, EnumFile::G), 
+                            to_square: <i8 as Squarey>::build_square(EnumRank::Eight, EnumFile::H),
+                        }
+                    )
+                );
+                println!("Third move made, G6H8.");
+                println!("Perft from offender:");
+                let (total_num, sub_perfts) = depth_n_better_perft(curr_pos, 1);
+                println!("Total: {}", total_num);
+                for (move_made, successors_num) in sub_perfts {
+                    println!("{0} - {1}", move_made, successors_num)
+                }
+
+                // Problem is that Cladonia thinks that black can legally castle kingside in this position.
+                // The knight has taken the rook, so this should be impossible, but castling removal doesn't
+                // trigger on the taken squares as-is. 
+
+                // Added in castling removal from the target (``to") squares of standard and promotion moves.
+            }
+        }
+    } else if third_test_pos_two {
+        println!("Perft from Kiwipete:");
+        let try_kiwipete_pos = interpret_fen(kiwipete_string);
+        match try_kiwipete_pos {
+            Err(some_error) => println!("Error with parsing Kiwipete: {}", some_error),
+            Ok(kiwipete) => {
+                let mut curr_pos = kiwipete;
+                println!("Kiwipete initialized.");
+                curr_pos.make_move(
+                    ChessMove::StandardMove(
+                        StandardMove {
+                            from_square: <i8 as Squarey>::build_square(EnumRank::Five, EnumFile::E), 
+                            to_square: <i8 as Squarey>::build_square(EnumRank::Seven, EnumFile::F),
+                        }
+                    )
+                );
+                println!("First move made, E5F7.");
+                curr_pos.make_move(
+                    ChessMove::StandardMove(
+                        StandardMove {
+                            from_square: <i8 as Squarey>::build_square(EnumRank::Three, EnumFile::H), 
+                            to_square: <i8 as Squarey>::build_square(EnumRank::Two, EnumFile::G),
+                        }
+                    )
+                );
+                println!("Second move made, H3G2.");
+                curr_pos.make_move(
+                    ChessMove::StandardMove(
+                        StandardMove {
+                            from_square: <i8 as Squarey>::build_square(EnumRank::Seven, EnumFile::F), 
+                            to_square: <i8 as Squarey>::build_square(EnumRank::Eight, EnumFile::H),
+                        }
+                    )
+                );
+                println!("Second move made, F7H8.");
+                println!("Perft from offender:");
+                let (total_num, sub_perfts) = depth_n_better_perft(curr_pos, 1);
+                println!("Total: {}", total_num);
+                for (move_made, successors_num) in sub_perfts {
+                    println!("{0} - {1}", move_made, successors_num)
+                }
+
+                // Problem is that Cladonia thinks that black can legally castle kingside in this position. Again.
+                // I thought I just fixed this?
+
+                // Oh. I removed the castling for the wrong color. Here comes another helper function.
+
+                // Fixed. Kiwipete perft total is now correct to depth four. Guess I just didn't check whether I'd actually 
+                // fixed the offending position with the last change.
+            }
         }
     }
 }
