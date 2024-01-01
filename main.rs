@@ -1,4 +1,4 @@
-use crate::chess::abstracts::helper_types::{StandardMove, ChessMove, EnumRank, EnumFile};
+use crate::chess::abstracts::helper_types::{StandardMove, ChessMove, EnumRank, EnumFile, PromotionMove};
 
 pub(crate) mod chess {
     pub(crate) mod abstracts {
@@ -873,12 +873,31 @@ pub(crate) mod chess {
                         Some(forward_square) => {
                             match self.query_square(forward_square).get_contents() {
                                 None => {
-                                    pawn_moves.push(
-                                        Self::MoveRep::build_move(
-                                            ChessMove::StandardMove(
-                                                StandardMove { 
-                                                    from_square: square, 
-                                                    to_square: forward_square })));
+                                    if forward_square.get_rank() == promotion_rank {
+                                        for promotion_option in [
+                                                    EnumPiecesUncolored::Queen,
+                                                    EnumPiecesUncolored::Knight,
+                                                    EnumPiecesUncolored::Rook,
+                                                    EnumPiecesUncolored::Bishop,
+                                                ] {
+                                                    pawn_moves.push(
+                                                        Self::MoveRep::build_move(
+                                                            ChessMove::PromotionMove(
+                                                                PromotionMove {
+                                                                    from_square: square, 
+                                                                    to_square: forward_square, 
+                                                                    promotion_choice: <Self::ContentsRep as Contentsy>::Content::build_piece(
+                                                                        self.get_color(), 
+                                                                        promotion_option)})))
+                                                }
+                                    } else {
+                                        pawn_moves.push(
+                                            Self::MoveRep::build_move(
+                                                ChessMove::StandardMove(
+                                                    StandardMove { 
+                                                        from_square: square, 
+                                                        to_square: forward_square })));
+                                    }
                                     if square.get_rank() == double_move_rank {
                                         match forward_square.try_get_offset_square(pawn_move_dir, SmallOffset::Stay) {
                                             None => panic!(),
@@ -2272,14 +2291,18 @@ pub(crate) mod chess {
 }
 
 fn main() {
-    use chess::{abstracts::helper_traits::*, implementations::impls_v0::*};
+    use chess::{abstracts::{helper_traits::*, helper_types::*}, implementations::impls_v0::*};
 
     let trying_startpos_perft = false;
     let first_test = false;
     let second_test = false;
     let third_test = false;
     let fourth_test = false;
+
     let testing_fen_builder = false;
+
+    let kiwipete_string = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1".to_string();
+    let trying_kiwipete_perft = true;
     let first_test_pos_two = true;
 
     if trying_startpos_perft {
@@ -2470,19 +2493,27 @@ fn main() {
     } else if testing_fen_builder {
         println!("Hopefully the parser correctly interprets the startpos fen... Here it is: \n{:?}", interpret_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string()));
         println!("Startpos for comparison: \nOk({:?})", STARTPOS);
+    } 
+    if trying_kiwipete_perft {
+        println!("Perft from Kiwipete:");
+        let try_kiwipete_pos = interpret_fen(kiwipete_string);
+        match try_kiwipete_pos {
+            Err(some_error) => println!("Error with parsing Kiwipete: {}", some_error),
+            Ok(kiwipete) => {
+                let (total_num, sub_perfts) = depth_n_better_perft(kiwipete, 4);
+                println!("Total: {}", total_num);
+                for (move_made, successors_num) in sub_perfts {
+                    println!("{0} - {1}", move_made, successors_num)
+                }
+            }
+        }
     } else if first_test_pos_two {
         println!("Perft from Kiwipete:");
-        let try_kiwipete_pos = interpret_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1".to_string());
+        let try_kiwipete_pos = interpret_fen(kiwipete_string);
         match try_kiwipete_pos {
             Err(some_error) => println!("Error with parsing Kiwipete: {}", some_error),
             Ok(kiwipete) => {
                 let mut curr_pos = kiwipete;
-                // let (total_num, sub_perfts) = depth_n_better_perft(curr_pos, 4);
-                // println!("Total: {}", total_num);
-                // for (move_made, successors_num) in sub_perfts {
-                //     println!("{0} - {1}", move_made, successors_num)
-                // }
-                // Correct to depth 3. Breaks drastically somehow at depth 4?
                 println!("Kiwipete initialized.");
                 curr_pos.make_move(
                     ChessMove::StandardMove(
@@ -2518,7 +2549,18 @@ fn main() {
                     println!("{0} - {1}", move_made, successors_num)
                 }
 
+                println!("Checking whether the problem is with legality checks: {}", !curr_pos.check_remaining_legality(ChessMove::PromotionMove(PromotionMove {
+                    from_square: i8::build_square(EnumRank::Two, EnumFile::G),
+                    to_square: i8::build_square(EnumRank::One, EnumFile::G),
+                    promotion_choice: i8::build_piece(EnumColor::Black, EnumPiecesUncolored::Knight)
+                })));
+
+                for constructed_move in curr_pos.get_pseudo_legal_proper_moves() {
+                    println!("Detected move {}", constructed_move);
+                }
+
                 // The G2G1 promotion moves are not detected.
+                // ... But G2G1 (NOT promotion) IS constructed by pseudolegal movegen.
             },
         }
     }
