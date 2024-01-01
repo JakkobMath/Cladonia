@@ -2003,6 +2003,270 @@ pub(crate) mod chess {
                 }
                 (grand_total, sub_perfts)
             }
+
+            enum FenInterpretationState {
+                ReadingPieces(i8),
+                ReadingColor,
+                ReadingCastling,
+                ReadingEPFile,
+                ReadingEPRank(EnumFile),
+                ReadingHalfMove(i8),
+                ReadingFullMove(i16),
+            }
+
+            fn vertical_flip_index(square: i8) -> i8 {
+                let original_rank = square.get_rank();
+                let file = square.get_file();
+                let new_rank = match original_rank {
+                    EnumRank::One => EnumRank::Eight,
+                    EnumRank::Two => EnumRank::Seven,
+                    EnumRank::Three => EnumRank::Six,
+                    EnumRank::Four => EnumRank::Five,
+                    EnumRank::Five => EnumRank::Four,
+                    EnumRank::Six => EnumRank::Three,
+                    EnumRank::Seven => EnumRank::Two,
+                    EnumRank::Eight => EnumRank::One,
+                };
+                i8::build_square(new_rank, file)
+            }
+
+            enum Either<L, R> {
+                Left(L),
+                Right(R),
+            }
+
+            #[allow(dead_code)]
+            pub(crate) fn interpret_fen(fen_str: String) -> Result<UnwrappedFen, String> {
+                // State machine?
+                let mut board_state = [-1i8; 64];
+                let mut color = None;
+                let mut curr_state = FenInterpretationState::ReadingPieces(0);
+                let mut w_king_square = -1i8;
+                let mut b_king_square = -1i8;
+                let mut castle_rules = [None, None, None, None];
+                let mut ep_square = None;
+                let mut half_moves = 0i8;
+                let mut full_moves = 0i16;
+
+                for character in fen_str.chars() {
+                    // println!("Processing character \"{}\"", character);
+                    match curr_state {
+                        FenInterpretationState::ReadingPieces(square_index) => {
+                            let read_result = match character {
+                                'P' => Either::Left(i8::build_piece(
+                                    EnumColor::White, 
+                                    EnumPiecesUncolored::Pawn
+                                )),
+                                'p' => Either::Left(i8::build_piece(
+                                    EnumColor::Black, 
+                                    EnumPiecesUncolored::Pawn
+                                )),
+                                'N' => Either::Left(i8::build_piece(
+                                    EnumColor::White, 
+                                    EnumPiecesUncolored::Knight
+                                )),
+                                'n' => Either::Left(i8::build_piece(
+                                    EnumColor::Black, 
+                                    EnumPiecesUncolored::Knight
+                                )),
+                                'B' => Either::Left(i8::build_piece(
+                                    EnumColor::White, 
+                                    EnumPiecesUncolored::Bishop
+                                )),
+                                'b' => Either::Left(i8::build_piece(
+                                    EnumColor::Black, 
+                                    EnumPiecesUncolored::Bishop
+                                )),
+                                'R' => Either::Left(i8::build_piece(
+                                    EnumColor::White, 
+                                    EnumPiecesUncolored::Rook
+                                )),
+                                'r' => Either::Left(i8::build_piece(
+                                    EnumColor::Black, 
+                                    EnumPiecesUncolored::Rook
+                                )),
+                                'Q' => Either::Left(i8::build_piece(
+                                    EnumColor::White, 
+                                    EnumPiecesUncolored::Queen
+                                )),
+                                'q' => Either::Left(i8::build_piece(
+                                    EnumColor::Black, 
+                                    EnumPiecesUncolored::Queen
+                                )),
+                                'K' => {
+                                    w_king_square = vertical_flip_index(square_index);
+                                    Either::Left(i8::build_piece(
+                                        EnumColor::White, 
+                                        EnumPiecesUncolored::King
+                                    ))
+                                },
+                                'k' => {
+                                    b_king_square = vertical_flip_index(square_index);
+                                    Either::Left(i8::build_piece(
+                                        EnumColor::Black, 
+                                        EnumPiecesUncolored::King
+                                    ))
+                                },
+                                ' ' => {
+                                    curr_state = FenInterpretationState::ReadingColor;
+                                    Either::Right(None)
+                                },
+                                '/' => Either::Right(None),
+                                _ => Either::Right(character.to_digit(10)),
+                            };
+                            match read_result {
+                                Either::Left(piece) => {
+                                    board_state[vertical_flip_index(square_index) as usize] = piece;
+                                    curr_state = FenInterpretationState::ReadingPieces(square_index + 1);
+                                },
+                                Either::Right(skipping) => {
+                                    match skipping {
+                                        None => {},
+                                        Some(number) => {
+                                            curr_state = FenInterpretationState::ReadingPieces(square_index + number as i8);
+                                        },
+                                    }
+                                },
+                            }
+                        },
+                        FenInterpretationState::ReadingColor => {
+                            match character {
+                                'w' => {
+                                    color = Some(EnumColor::White)
+                                },
+                                'b' => {
+                                    color = Some(EnumColor::Black)
+                                },
+                                ' ' => {
+                                    curr_state = FenInterpretationState::ReadingCastling;
+                                },
+                                _ => return Err("Couldn't read active color.".to_string())
+                            };
+                        },
+                        FenInterpretationState::ReadingCastling => {
+                            match character {
+                                'K' => castle_rules[0] = Some((
+                                    i8::build_square(EnumRank::One, EnumFile::E),
+                                    i8::build_square(EnumRank::One, EnumFile::H),
+                                    i8::build_square(EnumRank::One, EnumFile::G),
+                                    i8::build_square(EnumRank::One, EnumFile::F)
+                                )),
+                                'Q' => castle_rules[1] = Some((
+                                    i8::build_square(EnumRank::One, EnumFile::E),
+                                    i8::build_square(EnumRank::One, EnumFile::A),
+                                    i8::build_square(EnumRank::One, EnumFile::C),
+                                    i8::build_square(EnumRank::One, EnumFile::D)
+                                )),
+                                'k' => castle_rules[2] = Some((
+                                    i8::build_square(EnumRank::Eight, EnumFile::E),
+                                    i8::build_square(EnumRank::Eight, EnumFile::H),
+                                    i8::build_square(EnumRank::Eight, EnumFile::G),
+                                    i8::build_square(EnumRank::Eight, EnumFile::F)
+                                )),
+                                'q' => castle_rules[3] = Some((
+                                    i8::build_square(EnumRank::Eight, EnumFile::E),
+                                    i8::build_square(EnumRank::Eight, EnumFile::A),
+                                    i8::build_square(EnumRank::Eight, EnumFile::C),
+                                    i8::build_square(EnumRank::Eight, EnumFile::D)
+                                )),
+                                ' ' => curr_state = FenInterpretationState::ReadingEPFile,
+                                _ => return Err("Unexpected character when reading castling rules".to_string()),
+                            }
+                        },
+                        FenInterpretationState::ReadingEPFile => {
+                            let try_ep_file = match character {
+                                'a' => Some(EnumFile::A),
+                                'b' => Some(EnumFile::B),
+                                'c' => Some(EnumFile::C),
+                                'd' => Some(EnumFile::D),
+                                'e' => Some(EnumFile::E),
+                                'f' => Some(EnumFile::F),
+                                'g' => Some(EnumFile::G),
+                                'h' => Some(EnumFile::H),
+                                '-' => {
+                                    continue;
+                                }
+                                _ => None,
+                            };
+                            curr_state = match try_ep_file {
+                                None => FenInterpretationState::ReadingHalfMove(0i8),
+                                Some(ep_file) => FenInterpretationState::ReadingEPRank(ep_file),
+                            }
+                        },
+                        FenInterpretationState::ReadingEPRank(ep_file) => {
+                            let try_ep_rank = match character {
+                                '1' => Some(EnumRank::One),
+                                '2' => Some(EnumRank::Two),
+                                '3' => Some(EnumRank::Three),
+                                '4' => Some(EnumRank::Four),
+                                '5' => Some(EnumRank::Five),
+                                '6' => Some(EnumRank::Six),
+                                '7' => Some(EnumRank::Seven),
+                                '8' => Some(EnumRank::Eight),
+                                _ => None,
+                            };
+                            match try_ep_rank {
+                                None => return Err("Unexpected character when trying to read ep rank.".to_string()),
+                                Some(ep_rank) => ep_square = Some(i8::build_square(ep_rank, ep_file)),
+                            };
+                            curr_state = FenInterpretationState::ReadingHalfMove(0)
+                        },
+                        FenInterpretationState::ReadingHalfMove(prev_digits) => {
+                            match character {
+                                ' ' => {
+                                    half_moves = prev_digits;
+                                    curr_state = FenInterpretationState::ReadingFullMove(0);
+                                },
+                                _ => {
+                                    match character.to_digit(10) {
+                                        None => return Err("Unexpected character when trying to read halfmove count.".to_string()),
+                                        Some(digit) => curr_state = FenInterpretationState::ReadingHalfMove(10 * prev_digits + digit as i8),
+                                    }
+                                }
+                            }
+                        },
+                        FenInterpretationState::ReadingFullMove(prev_digits) => {
+                            match character.to_digit(10) {
+                                None => return Err("Unexpected character when trying to read fullmove count.".to_string()),
+                                Some(digit) => {
+                                    full_moves = 10 * prev_digits + digit as i16;
+                                    curr_state = FenInterpretationState::ReadingFullMove(full_moves);
+                                },
+                            }
+                        },
+                    }
+                }
+                match color {
+                    None => Err("Color is somehow missing.".to_string()),
+                    Some(true_color) => {
+                        match w_king_square < 0 {
+                            true => Err("White king undetected.".to_string()),
+                            false => {
+                                match b_king_square < 0 {
+                                    true => Err("Black king undetected.".to_string()),
+                                    false => {
+                                        Ok(
+                                            UnwrappedFen {
+                                                board: board_state,
+                                                moving_side: true_color,
+                                                ply_count: half_moves,
+                                                move_count: full_moves,
+                                                raw_castling_data: castle_rules,
+                                                ep_data: match ep_square {
+                                                    None => -1i8,
+                                                    Some(square) => square,
+                                                },
+                                                w_king_square: w_king_square,
+                                                b_king_square: b_king_square
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -2010,11 +2274,13 @@ pub(crate) mod chess {
 fn main() {
     use chess::{abstracts::helper_traits::*, implementations::impls_v0::*};
 
-    let trying_startpos_perft = true;
+    let trying_startpos_perft = false;
     let first_test = false;
     let second_test = false;
     let third_test = false;
-    let fourth_test = true;
+    let fourth_test = false;
+    let testing_fen_builder = false;
+    let first_test_pos_two = true;
 
     if trying_startpos_perft {
         println!("Perft from STARTPOS:");
@@ -2201,5 +2467,59 @@ fn main() {
 
         // Perft totals are now correct to depth 5. I haven't checked each of the 20 start move totals, but the first several
         // at least should still be correct from when they were checked to find the line in this test.
+    } else if testing_fen_builder {
+        println!("Hopefully the parser correctly interprets the startpos fen... Here it is: \n{:?}", interpret_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string()));
+        println!("Startpos for comparison: \nOk({:?})", STARTPOS);
+    } else if first_test_pos_two {
+        println!("Perft from Kiwipete:");
+        let try_kiwipete_pos = interpret_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1".to_string());
+        match try_kiwipete_pos {
+            Err(some_error) => println!("Error with parsing Kiwipete: {}", some_error),
+            Ok(kiwipete) => {
+                let mut curr_pos = kiwipete;
+                // let (total_num, sub_perfts) = depth_n_better_perft(curr_pos, 4);
+                // println!("Total: {}", total_num);
+                // for (move_made, successors_num) in sub_perfts {
+                //     println!("{0} - {1}", move_made, successors_num)
+                // }
+                // Correct to depth 3. Breaks drastically somehow at depth 4?
+                println!("Kiwipete initialized.");
+                curr_pos.make_move(
+                    ChessMove::StandardMove(
+                        StandardMove {
+                            from_square: <i8 as Squarey>::build_square(EnumRank::One, EnumFile::A), 
+                            to_square: <i8 as Squarey>::build_square(EnumRank::One, EnumFile::B),
+                        }
+                    )
+                );
+                println!("First move made, A1B1.");
+                curr_pos.make_move(
+                    ChessMove::StandardMove(
+                        StandardMove {
+                            from_square: <i8 as Squarey>::build_square(EnumRank::Three, EnumFile::H), 
+                            to_square: <i8 as Squarey>::build_square(EnumRank::Two, EnumFile::G),
+                        }
+                    )
+                );
+                println!("Second move made, H3G2.");
+                curr_pos.make_move(
+                    ChessMove::StandardMove(
+                        StandardMove {
+                            from_square: <i8 as Squarey>::build_square(EnumRank::Five, EnumFile::E), 
+                            to_square: <i8 as Squarey>::build_square(EnumRank::Six, EnumFile::C),
+                        }
+                    )
+                );
+                println!("Third move made, E5C6.");
+                println!("Perft from offender:");
+                let (total_num, sub_perfts) = depth_n_better_perft(curr_pos, 1);
+                println!("Total: {}", total_num);
+                for (move_made, successors_num) in sub_perfts {
+                    println!("{0} - {1}", move_made, successors_num)
+                }
+
+                // The G2G1 promotion moves are not detected.
+            },
+        }
     }
 }
