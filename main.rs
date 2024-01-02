@@ -1,24 +1,25 @@
 
 // The structure here is as follows: There is a module for chess (I'm open to adding similar modules 
 // for other games later) containing code that encodes the rules of chess. The module is divided into 
-// a few parts. The abstracts submodule extends the ``no magic numbers" principle to ``no magic types." 
-// Everything in it should be implemented at the trait level, using traits to encode the condition that 
-// compliant types either contain or are equivalent to various unoptimized helper types which 
-// correspond directly with the rules of the game as you'd explain them to a human. This allows code 
-// like movegen and legality checking to be implemented polymorphically over representations, including 
-// representations that support variants like 960 or double 960. Keeping the abstracts section abstract 
-// is one of the goals of Cladonia, with the hope being that this will keep things as flexible, 
-// modular, and extensible as possible. All optimizations improving the default methods for specific 
-// types should take place in the second ``implementations" submodule. I'd like to stress that the 
-// implementations submodule specifies the types actually used by the code- everything with the helper 
-// types should be inlined out of existence, and mostly serve to make the code more straightforward for 
-// me to read and write by allowing pattern matching et cetera. Eventually the chess module will also 
-// contain chess-specific code for use by the search, such as evaluations and move ordering. I would 
-// like to write the search to be polymorphic over games if possible, and allow games to implement any 
-// game-specific optimizations for the search to plug into itself and make use of. I would also like 
-// the search to be as polymorphic over evaluation spaces as possible, perhaps only requiring them to 
-// implement get_minimum and negation (swap sides) functions but including further optimizations when 
-// types also implement, say, the minimal window-querying functionality for alpha-beta to function. 
+// a few parts. The abstracts submodule (AND SPECIFICALLY THAT MODULE) extends the ``no magic numbers" 
+// principle to ``no magic types." Everything in it should be implemented at the trait level, using 
+// traits to encode the condition that compliant types either contain or are equivalent to various 
+// unoptimized helper types which correspond directly with the rules of the game as you'd explain them 
+// to a human. This allows code like movegen and legality checking to be implemented polymorphically 
+// over representations, including representations that support variants like 960 or double 960. 
+// Keeping the abstracts section abstract is one of the goals of Cladonia, with the hope being that 
+// this will keep things as flexible, modular, and extensible as possible. All optimizations improving 
+// the default methods for specific types should take place in the second ``implementations" submodule. 
+// I'd like to stress that the implementations submodule specifies the types actually used by the code- 
+// everything with the helper types should be inlined out of existence, and mostly serve to make the 
+// code more straightforward for me to read and write by allowing pattern matching et cetera. 
+// Eventually the chess module will also contain chess-specific code for use by the search, such as 
+// evaluations and move ordering. I would like to write the search to be polymorphic over games if 
+// possible, and allow games to implement any game-specific optimizations for the search to plug into 
+// itself and make use of. I would also like the search to be as polymorphic over evaluation spaces as 
+// possible, perhaps only requiring them to implement get_minimum and negation (swap sides) functions 
+// but including further optimizations when types also implement, say, the minimal window-querying 
+// functionality for alpha-beta to function. 
 
 pub(crate) mod chess {
 
@@ -1710,7 +1711,7 @@ pub(crate) mod chess {
             // contains functionality used to perft-test the movegen code.
 
             use super::*;
-            
+
             // Colored for i8.
             // Pairing 0 and 1 together, 2 and 3, and so forth. Last bit is color info.
             impl Colored for i8 {
@@ -2475,6 +2476,19 @@ pub(crate) mod chess {
         }
     }
 }
+
+pub(crate) mod search {
+    pub(crate) mod eval_abstracts {
+        pub(crate) trait NegamaxCompatible: Ord + Neg {}
+        pub(crate) trait ABCompatible: Ord + Neg {
+            type WindowParams: Default;
+            type Window: Neg;
+            fn window_about(&self, params: WindowParams) -> Window;
+            fn in_window(&self, window: Window) -> bool;
+        }
+    }
+}
+
 
 fn main() {
     use chess::{abstracts::{helper_traits::*, helper_types::*}, implementations::impls_v0::*};
