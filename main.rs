@@ -1,15 +1,67 @@
+
+// By way of introduction: you the reader should be aware that I'm inclined to try to do things much 
+// more abstractly than is really necessary. I am not a particularly experienced coder, and a lot of 
+// what I've read on the subject is leaning towards the type theory side of things. Based on the 
+// coding experience that I do have, I'm pretty sure *I'd* have a harder time if I was writing code 
+// in a less wrapped-up way where it was easier to mix up types, or a more concrete way where it was 
+// easier to forget which parts of an object represent what. By contrast, I do pretty well with 
+// abstraction, and like the flexibility it offers. I've tried to include a lot of comments to 
+// explain what I'm doing and why. I'm open to feedback that furthers my goals with this project or 
+// makes an attempt to do so, but one of those goals is to keep things abstract where possible. I 
+// would not be opposed to making an engine that reuses all of the search code but also plays 
+// Othello, Shogi, and Go when analogs of the chess module are added for those games and evaluation
+// code is provided. Performance is another goal, but I'd rather get it by overloading existing
+// functions for suitable types than by committing to use those concrete types where it's not 
+// strictly necessary and any type satisfying a particular trait would work just as well.
+
 pub(crate) mod chess {
+
+    // This module deals only with chess. In particular, it provides a trait for types which contain 
+    // gamestate information, provides basic pseudolegal movegen code and legality checking code for 
+    // types implementing said trait, and gives a particular implementation of that trait together 
+    // with a FEN parser. Future work should add gamestate types implementing FENnec which are more 
+    // amenable to the kinds of computations Cladonia will be doing and override FENnec methods to 
+    // make movegen actually fast. For example, I'll probably use this default movegen to generate 
+    // magic bitboards at some point. 
+
     pub(crate) mod abstracts {
+
+        // This module deals with the abstract rules of chess at the trait level and implements basic 
+        // (read: slow) code for things like pseudolegal movegen, legality checking, etc for types 
+        // implementing those traits. That code is intended largely to let me experiment quickly with 
+        // different implementations of things like gamestate representations without having to 
+        // implement and debug movegen et cetera every time. Most of this code should be de facto dead 
+        // for normal use once better alternatives exist. Note that this code is also trying to be as 
+        // generally applicable as possible. It should, for instance, be 960 (^2) compatible if I did 
+        // everything right. "No magic numbers" starts getting turned into "no magic types" here- the 
+        // only non-custom types are usize for arrays, i8 to hold gaps between ranks/files and the 
+        // 50mr counter, and i16 to hold the move counter (to the best of my recollection). 
+
         pub(crate)  mod helper_types {
+
+            // This module contains types for representing chess-specific information. It exists 
+            // largely to add an extra layer of type safety, so that it becomes impossible for 
+            // instance to accidentally read a file as a rank in the movegen code. THESE TYPES 
+            // ARE NOT MEANT TO BECOME FIELDS IN ANY ``FEN" STRUCT LATER. I'm not crazy enough to 
+            // build on these directly, they're just here to keep me honest when I say I've implemented 
+            // the traits in the next module! If all goes well, almost everything here will be inlined 
+            // completely out of existence by the compiler everywhere they appear, and later types 
+            // implementing efficient chess-related traits will probably avoid explicit reference to 
+            // these as much as possible. I am really taking Rust at its word when it advertises 
+            // zero-cost abstractions here. 
+
             #![allow(dead_code)]
             use super::helper_traits::*;
 
+            // The color of a chess piece, or the side to move in an ongoing game. 
+            // This had better be a synonym for a boolean under the hood. 
             #[derive(Clone, Copy, PartialEq, Eq, Debug)]
             pub(crate) enum EnumColor {
                 White,
                 Black,
             }
 
+            // The kinds of chess pieces. 
             #[derive(Clone, Copy, PartialEq, Eq, Debug)]
             pub(crate) enum EnumPiecesUncolored {
                 Pawn,
@@ -20,6 +72,9 @@ pub(crate) mod chess {
                 King,
             }
 
+            // The ranks on a chess board. I know I could use i8s or somthing here. 
+            // I'm trusting Rust to make the smart structural decisions that I refuse 
+            // to directly have anything to do with in this module. 
             #[derive(Clone, Copy, PartialEq, Eq, Debug)]
             pub(crate) enum EnumRank {
                 One,
@@ -32,6 +87,7 @@ pub(crate) mod chess {
                 Eight,
             }
 
+            // The files on a chess board. See above. 
             #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
             pub(crate) enum EnumFile {
                 A,
@@ -44,6 +100,8 @@ pub(crate) mod chess {
                 H,
             }
 
+            // This one specifically has got to be extra bad. Pieces move 
+            // at most two squares in a given direction in a single step. 
             #[derive(Clone, Copy, PartialEq, Eq, Debug)]
             pub(crate) enum SmallOffset {
                 MinusTwo,
@@ -53,18 +111,29 @@ pub(crate) mod chess {
                 PlusTwo,
             }
 
+            // Rays should be useful for sliding pieces later (before implementing bitboards). 
+            // They become iterators later with conditions on Pos and Dir. 
             #[derive(Debug)]
             pub(crate) struct Ray<Pos, Dir> {
                 pub(crate) curr_pos: Pos,
                 pub(crate) direction: Dir,
             }
 
+            // Building up to the match-statement-amenable representation of chess moves. 
             #[derive(Clone, Copy, Debug)]
             pub(crate) struct StandardMove<PositionRep: Squarey> {
                 pub(crate) from_square: PositionRep,
                 pub(crate) to_square: PositionRep,
             }
 
+            // En passant moves affect a third square. Even if I represent actual moves 
+            // differently later, I need those that parse into en passant moves to make 
+            // the identity of all three squares readily available to the code that 
+            // updates the board state. If you find this painful, be glad I'm not having
+            // these things also store the type of piece being moved! I did consider that,
+            // but it's extracted from the board instead in the default implementation
+            // (and probably copied from data already grabbed by some parent function in 
+            // an efficient version).
             #[derive(Clone, Copy, Debug)]
             pub(crate) struct EnPassantMove<PositionRep: Squarey> {
                 pub(crate) from_square: PositionRep,
@@ -72,6 +141,11 @@ pub(crate) mod chess {
                 pub(crate) to_square: PositionRep,
             }
 
+            // Yes, this is overkill. Counterpoint: however I do eventually represent
+            // castling moves, I will need to be able to extract all of this information.
+            // That's the role this type serves here. As a bonus, this makes castling
+            // compatible with all the weird movesets for free as long as you have a type
+            // that can handle it. 
             #[derive(Clone, Copy, Debug)]
             pub(crate) struct CastlingMove<PositionRep: Squarey> {
                 pub(crate) king_from: PositionRep,
@@ -80,6 +154,10 @@ pub(crate) mod chess {
                 pub(crate) rook_to: PositionRep,
             }
 
+            // You get the drill. Promotion moves move a pawn to the last rank, and must 
+            // also commit to a particular type of piece for that pawn to promote to. 
+            // Movegen doesn't admit promoting to an opponent's piece, but this type 
+            // could support it for the chess variant where that's possible. 
             #[derive(Clone, Copy, Debug)]
             pub(crate) struct PromotionMove<PositionRep: Squarey, PieceRep: Piecey> {
                 pub(crate) from_square: PositionRep,
@@ -87,6 +165,8 @@ pub(crate) mod chess {
                 pub(crate) promotion_choice: PieceRep,
             }
 
+            // Great type. 10 out of good. Would have the inliner 
+            // cast it into the abyss as often as possible. 
             #[derive(Clone, Copy, Debug)]
             pub(crate) enum ChessMove<PositionRep: Squarey, PieceRep: Piecey> {
                 StandardMove(StandardMove<PositionRep>),
@@ -98,6 +178,12 @@ pub(crate) mod chess {
         }
 
         pub(crate) mod helper_consts {
+
+            // This module contains certain constants found in the rules of chess that 
+            // are convenient to not have to write down all the time. Pawn directions 
+            // would also fit in here, but I put them directly in the movegen code 
+            // instead. 
+
             #![allow(dead_code)]
             use super::helper_types::*;
 
@@ -142,18 +228,32 @@ pub(crate) mod chess {
 
         pub(crate) mod helper_traits {
 
+            // This is the core of the abstracts module, and contains the traits that 
+            // control which types can be used to represent various parts of a game of 
+            // chess. They largely say that things have to implement setters and getters 
+            // for things made out of the types in the helper_types module. I considered 
+            // doing lenses for that, and then started trying to justify shoving profunctor 
+            // optics into Cladonia, but eventually decided that would probably handicap 
+            // the overload-things-to-make-them-efficient process. 
+
             use super::{helper_types::*, helper_consts::*};
 
+            // Pieces have colors, boards have an active color, et cetera. 
+            // https://www.reddit.com/media?url=https%3A%2F%2Fi.redd.it%2F8nkzqrq6cmia1.jpg 
+            // I don't think I got that from Reddit originally, but this was the 
+            // first thing on Google when I went to find it. 
             pub(crate) trait Colored {
                 fn get_color(&self) -> EnumColor;
                 fn set_color(&mut self, color: EnumColor) -> ();
                 fn get_opposite_color(&self) -> EnumColor {
                     // EnumColor overrides this method to actually do something. 
-                    // This is just helpful shorthand.
+                    // This is just helpful shorthand. 
                     self.get_color().get_opposite_color() 
                 }
             }
 
+            // From set and get: pieces or things containing dedicated piece-storing data. 
+            // The build function demands that the piece-storing data be the only data in the type. 
             pub(crate) trait Piecey: Colored + Sized + Copy {
                 fn get_piece_type(&self) -> EnumPiecesUncolored;
                 fn set_piece_type(&mut self, piece_type: EnumPiecesUncolored) -> () {
@@ -162,6 +262,8 @@ pub(crate) mod chess {
                 fn build_piece(piece_color: EnumColor, piece_type: EnumPiecesUncolored) -> Self;
             }
 
+            // Board squares may or may not contain a piece. Effectively this is the same 
+            // as the above, data serving as proxy for Option<piece>.
             pub(crate) trait Contentsy: Sized + Copy {
                 type Content: Piecey;
                 fn get_contents(&self) -> Option<Self::Content>;
@@ -171,6 +273,10 @@ pub(crate) mod chess {
                 fn build_contents(contents: Option<Self::Content>) -> Self;
             }
 
+            // No build function: this just means *having* rank data. We also need to be 
+            // able to move ranked things around and figure out distances between them, 
+            // but those functions can be provided to the user rather than demanded of 
+            // them. Covariance vs contravariance sort of thing. 
             pub(crate) trait Ranked: Sized + Copy {
                 fn get_rank(&self) -> EnumRank;
                 fn set_rank(&mut self, rank: EnumRank) -> ();
@@ -184,11 +290,13 @@ pub(crate) mod chess {
                         }
                     }
                 }
+                // The EnumRank type overloads this to do something. 
                 fn rank_gap(&self, other_rank: &Self) -> i8 {
                     self.get_rank().rank_gap(&other_rank.get_rank())
                 }
             }
 
+            // Similar to the above. 
             pub(crate) trait Filed: Sized + Copy + PartialOrd {
                 fn get_file(&self) -> EnumFile;
                 fn set_file(&mut self, file: EnumFile) -> ();
@@ -202,11 +310,18 @@ pub(crate) mod chess {
                         }
                     }
                 }
+                // Overloaded by the EnumFile type. 
                 fn file_gap(&self, other_file: &Self) -> i8 {
                     self.get_file().file_gap(&other_file.get_file())
                 }
             }
 
+            // The build function guarantees that this data is *like* a description of a square 
+            // rather than just containing the description of a square. This is in one sense a 
+            // proxy for an (EnumRank, EnumFile) pair, but we can use more efficient representations 
+            // than that. This type also provides a lot of functions that do a lot of the heavy 
+            // lifting in the movegen code later, such as getting pseudolegal <piece> moves out of 
+            // the square being described. 
             pub(crate) trait Squarey: Ranked + Filed {
                 fn set_square(&mut self, rank: EnumRank, file: EnumFile) -> () {
                     self.set_file(file);
@@ -375,6 +490,12 @@ pub(crate) mod chess {
                 }
             }
 
+            // Getter and builder make this like a description of a move. Hopefully the conversion to 
+            // a ChessMove gets inlined away, that seems like it'd be inefficient. On the other hand 
+            // I think impls_v0 just uses the ChessMove type directly, because it was convenient and 
+            // making a ChessMove proxy seemed harder. It probably matters less here than for board 
+            // or game state data because moves should probably be consumed pretty quickly on average 
+            // and not take up much space. Profiler will tell. 
             pub(crate) trait Movey<PositionRep, PieceRep>: Sized + Copy
             where PositionRep: Squarey, PieceRep: Piecey,
             {
@@ -389,6 +510,8 @@ pub(crate) mod chess {
                 }
             }
 
+            // The quality of containing boardlike data, together with provided functions for chess things 
+            // where board state is sufficient (that is, 50mr, castling, et cetera are unnecessary). 
             pub(crate) trait HasBoard: Sized + Copy {
                 type PositionRep: Squarey;
                 type ContentsRep: Contentsy;
@@ -398,6 +521,8 @@ pub(crate) mod chess {
 
                 fn query_square(&self, square: Self::PositionRep) -> Self::ContentsRep;
                 fn set_square(&mut self, square: Self::PositionRep, new_contents: Self::ContentsRep) -> ();
+
+                // For doing things like detecting whether the king is in check. 
                 fn sees_obvious_attack(&self, defending_color: EnumColor, square: Self::PositionRep) -> bool {
 
                     let reverse_opponent_pawn_move_dir = match defending_color {
@@ -482,6 +607,7 @@ pub(crate) mod chess {
 
                     return false
                 }
+                // For doing things like detecting *why* the king is in check. 
                 fn get_obvious_attackers(&self, defending_color: EnumColor, square: Self::PositionRep) -> Vec<Self::MoveRep> {
 
                     let mut attacking_moves = Vec::new();
@@ -602,6 +728,10 @@ pub(crate) mod chess {
                     attacking_moves
                 }
                 
+                // Freeze any extra FEN-type data (etc) and just update the position. If I 
+                // implement custom NNUE code this would probably also affect the accumulators. 
+                // This version copies the new position to another place and retains the original, 
+                // the one beneath it alters the original in place. 
                 fn after_frozen_move(&self, possible_move: Self::MoveRep) -> Self {
                     let mut after_pos = *self;
                     after_pos.frozen_make_move(possible_move);
@@ -645,6 +775,8 @@ pub(crate) mod chess {
                 }
             }
 
+            // Set and get method: types implementing this have a ply counter. 
+            // It should be logically equivalent to the provided one, as usual. 
             pub(crate) trait PlyCounting {
                 fn get_ply_count(&self) -> i8;
                 fn set_ply_count(&mut self, ply_count: i8) -> ();
@@ -660,6 +792,8 @@ pub(crate) mod chess {
                 }
             }
 
+            // Similar to the above. The longest possible chess game assuming 
+            // strict 50mr enforcement falls in the i16 range. 
             pub(crate) trait MoveCounting {
                 fn get_move_count(&self) -> i16;
                 fn set_move_count(&mut self, move_count: i16) -> ();
@@ -668,6 +802,11 @@ pub(crate) mod chess {
                 }
             }
 
+            // The big deal trait: this contains all the data necessary to extract a FEN. 
+            // Supports variants with weird castling rules like 960. Types optimized for 
+            // standard play can have the relevant set methods round to the nearest valid 
+            // option for implementation purposes, but should probably throw an error if 
+            // you try to construct an invalid position and avoid using set methods directly. 
             pub(crate) trait FENnec: HasBoard + Colored + PlyCounting + MoveCounting + Sized + Copy {
                 fn get_castling(&self, color: EnumColor) -> [Option<CastlingMove<Self::PositionRep>>; 2];
                 fn set_castling(&mut self, color: EnumColor, new_rules: [Option<CastlingMove<Self::PositionRep>>; 2]) -> ();
@@ -1268,6 +1407,18 @@ pub(crate) mod chess {
         }
 
         pub(crate) mod default_implementations {
+
+            // This module provides default implementations for several of the naive types 
+            // you might use to hold chess-relevant data. While I do not plan on using these 
+            // types for computations in general, several traits implement default methods 
+            // for the user which simply offload the work onto relevant helper types, which 
+            // are expected to directly know how to implement those methods. Thus it is 
+            // important that those helper types implement the relevant traits and overload 
+            // these lazy default methods to avoid circular dependency. 
+            // Also, it is very important for a lot of the logic that rays implement the 
+            // Iterator trait. It's very convenient to have access to ``for square in ray" 
+            // syntax. 
+
             use super::{helper_types::*,helper_traits::*};
 
             impl Colored for EnumColor {
@@ -1538,11 +1689,22 @@ pub(crate) mod chess {
     }
 
     pub(crate) mod implementations {
+
+        // This is where actual implementations of the traits in the above module go. 
+        // The types here allow you to actually store chess-related data and call 
+        // chess-related functions, and later impls_version submodules are expected 
+        // to become progressively better at this. 
+
         use super::abstracts::{helper_traits::*, helper_types::*};
 
         pub(crate) mod impls_v0 {
 
+            // This is the first and most basic implementation of the chess traits. 
+            // Nothing fancy going on, including any kind of bitboard. It also 
+            // contains functionality used to perft-test the movegen code.
+
             use super::*;
+            
             // Colored for i8.
             // Pairing 0 and 1 together, 2 and 3, and so forth. Last bit is color info.
             impl Colored for i8 {
