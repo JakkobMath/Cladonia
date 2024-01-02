@@ -2206,6 +2206,7 @@ pub(crate) mod chess {
                                     i8::build_square(EnumRank::Eight, EnumFile::D)
                                 )),
                                 ' ' => curr_state = FenInterpretationState::ReadingEPFile,
+                                '-' => {},
                                 _ => return Err("Unexpected character when reading castling rules".to_string()),
                             }
                         },
@@ -2310,7 +2311,7 @@ pub(crate) mod chess {
 fn main() {
     use chess::{abstracts::{helper_traits::*, helper_types::*}, implementations::impls_v0::*};
 
-    let trying_startpos_perft = false;
+    let trying_startpos_perft = true;
     let first_test = false;
     let second_test = false;
     let third_test = false;
@@ -2322,7 +2323,19 @@ fn main() {
     let trying_kiwipete_perft = true;
     let first_test_pos_two = false;
     let second_test_pos_two = false;
-    let third_test_pos_two = true;
+    let third_test_pos_two = false;
+
+    let pos_3_string = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1".to_string();
+    let trying_pos_3_perft = true;
+
+    let pos_4_string = "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1".to_string();
+    let trying_pos_4_perft = true;
+
+    let pos_5_string = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8".to_string();
+    let trying_pos_5_perft = true;
+
+    let pos_6_string = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10".to_string();
+    let trying_pos_6_perft = true;
 
     if trying_startpos_perft {
         println!("Perft from STARTPOS:");
@@ -2683,4 +2696,73 @@ fn main() {
             }
         }
     }
+    if trying_pos_3_perft {
+        println!("Perft from Position 3:");
+        let try_get_pos = interpret_fen(pos_3_string);
+        match try_get_pos {
+            Err(some_error) => println!("Error with parsing Position 3: {}", some_error),
+            Ok(pos_3) => {
+                let (total_num, sub_perfts) = depth_n_better_perft(pos_3, 4);
+                println!("Total: {}", total_num);
+                for (move_made, successors_num) in sub_perfts {
+                    println!("{0} - {1}", move_made, successors_num)
+                }
+            }
+        }
+
+        // Initially didn't parse because castling rules handler didn't know that '-' 
+        // in the castling spot should be interpreted as ``no castling."
+
+        // After fixing the parser, perft is correct to depth 4 right off the bat.
+    }
+    if trying_pos_4_perft {
+        println!("Perft from Position 4:");
+        let try_get_pos = interpret_fen(pos_4_string);
+        match try_get_pos {
+            Err(some_error) => println!("Error with parsing Position 4: {}", some_error),
+            Ok(pos_4) => {
+                let (total_num, sub_perfts) = depth_n_better_perft(pos_4, 4);
+                println!("Total: {}", total_num);
+                for (move_made, successors_num) in sub_perfts {
+                    println!("{0} - {1}", move_made, successors_num)
+                }
+            }
+        }
+
+        // Correct from the get-go to depth 4.
+    }
+    if trying_pos_5_perft {
+        println!("Perft from Position 5:");
+        let try_get_pos = interpret_fen(pos_5_string);
+        match try_get_pos {
+            Err(some_error) => println!("Error with parsing Position 5: {}", some_error),
+            Ok(pos_5) => {
+                let (total_num, sub_perfts) = depth_n_better_perft(pos_5, 4);
+                println!("Total: {}", total_num);
+                for (move_made, successors_num) in sub_perfts {
+                    println!("{0} - {1}", move_made, successors_num)
+                }
+            }
+        }
+
+        // No issues at depth 4.
+    }
+    if trying_pos_6_perft {
+        println!("Perft from Position 6:");
+        let try_get_pos = interpret_fen(pos_6_string);
+        match try_get_pos {
+            Err(some_error) => println!("Error with parsing Position 6: {}", some_error),
+            Ok(pos_6) => {
+                let (total_num, sub_perfts) = depth_n_better_perft(pos_6, 4);
+                println!("Total: {}", total_num);
+                for (move_made, successors_num) in sub_perfts {
+                    println!("{0} - {1}", move_made, successors_num)
+                }
+            }
+        }
+
+        // No issues at depth 4 :).
+    }
+
+    // Perft for all tested positions gives correct totals up to depth 4, and startpos is correct to depth 5. 
 }
