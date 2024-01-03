@@ -26,7 +26,7 @@ pub(crate) mod chess;
 pub(crate) mod search;
 
 fn main() {
-    use chess::{abstracts::{helper_traits::*, helper_types::*}, implementations::impls_v0::*};
+    use chess::{abstracts::{helper_traits::*, helper_types::*}, implementations::impls_vzero::*};
 
     let trying_startpos_perft = true;
     let first_test = false;
@@ -56,7 +56,7 @@ fn main() {
 
     if trying_startpos_perft {
         println!("Perft from STARTPOS:");
-        let (total_num, sub_perfts) = depth_n_better_perft(STARTPOS, 5);
+        let (total_num, sub_perfts) = depth_n_better_perft(STARTPOS, 4);
         println!("Total: {}", total_num);
         for (move_made, successors_num) in sub_perfts {
             println!("{0} - {1}", move_made, successors_num)
@@ -419,7 +419,7 @@ fn main() {
         match try_get_pos {
             Err(some_error) => println!("Error with parsing Position 3: {}", some_error),
             Ok(pos_3) => {
-                let (total_num, sub_perfts) = depth_n_better_perft(pos_3, 4);
+                let (total_num, sub_perfts) = depth_n_better_perft(pos_3, 5);
                 println!("Total: {}", total_num);
                 for (move_made, successors_num) in sub_perfts {
                     println!("{0} - {1}", move_made, successors_num)
