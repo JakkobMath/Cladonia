@@ -28,7 +28,7 @@ pub(crate) mod search;
 fn main() {
     use chess::{abstracts::{helper_traits::*, helper_types::*}, implementations::impls_vzero::*};
 
-    let trying_startpos_perft = true;
+    let trying_startpos_perft = false;
     let first_test = false;
     let second_test = false;
     let third_test = false;
@@ -37,7 +37,7 @@ fn main() {
     let testing_fen_builder = false;
 
     let kiwipete_string = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1".to_string();
-    let trying_kiwipete_perft = true;
+    let trying_kiwipete_perft = false;
     let first_test_pos_two = false;
     let second_test_pos_two = false;
     let third_test_pos_two = false;
