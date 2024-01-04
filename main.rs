@@ -23,6 +23,17 @@
 
 pub(crate) mod chess;
 
+pub(crate) mod game_data {
+    // The search needs a generic way to interface with games. We need an analog of FENnec providing 
+    // some sort of functionality that the search can use. 
+
+    // Or perhaps the search only takes in an eval, and the eval provides the gamestate type the search 
+    // will be using. I'll probably go with that: the search can require the eval to implement some 
+    // additional functionality if it needs to constrain gamestates reps. Each impls submodule should 
+    // specify what evals need to provide to be compatible with the gamestate representation they 
+    // provide. Then evals can implement those various traits on their own time. 
+}
+
 pub(crate) mod search;
 
 fn main() {
