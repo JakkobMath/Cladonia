@@ -2,8 +2,14 @@
 // This is just a draft for now.
 
 pub(crate) mod eval_abstracts {
+
+    // Different search methods demand different traits from the evaluation functions provided to 
+    // them. This is intended to be a place to put those traits for now. 
+
     use std::ops::Neg;
+
     pub(crate) trait NegamaxCompatible: Ord + Neg {}
+
     pub(crate) trait ABCompatible: Ord + Neg {
         type WindowParams: Default;
         type Window: Neg;
@@ -34,3 +40,29 @@ eval to require the gamestate representations to implement an is_quiet function.
 I really, really hope that inlining combines this all more.
 
 */
+
+pub(crate) mod searches {
+
+    // To hold the code for Negamax, AB, etc until I possibly rearrange things. 
+    // Also search abstracts.
+
+    pub(crate) trait BasicGamestate: Copy {
+        type MoveRep;
+
+        fn get_legal_moves(&self) -> Vec<Self::MoveRep>;
+
+        fn make_move(&mut self, legal_move: Self::MoveRep) -> ();
+        fn after_move(&self, legal_move: Self::MoveRep) -> Self;
+    }
+
+    pub(crate) trait PseudolegalGeneratingGamestate: Copy {
+        type MoveRep;
+
+        fn get_pseudolegal_moves(&self) -> Vec<Self::MoveRep>;
+        fn check_remaining_legality(&self, pseudolegal_move: Self::MoveRep) -> bool;
+
+        fn make_move(&mut self, legal_move: Self::MoveRep) -> ();
+        fn after_move(&self, legal_move: Self::MoveRep) -> Self;
+    }
+
+}
