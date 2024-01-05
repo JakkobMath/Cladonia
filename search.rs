@@ -41,6 +41,24 @@ I really, really hope that inlining combines this all more.
 
 */
 
+/*
+
+The chess module exists largely to provide the FENnec trait and some methods associated to it. If 
+we want to allow the possibility of running other games through the same search code, we'll 
+probably need to generalize FENnec into some larger Searchable trait...
+
+Let BasicSearchable be the trait encoding the minimum functionality common whenever there's a 
+triple of compatible gamestate/evaluator/basic search method. For example, the basic search 
+methods might include BFS-negamax, the basically indistinguishable but longer BFS-minimax, AB, 
+true MCTS, UCT-MCTS, PUCT, et cetera. Also in the search code, create traits like 
+AdmitsQuiescenceSearch, AdmitsWDLRescaling, AdmitsTranspositionTables, AdmitsOpeningBook, 
+AdmitsEndgameTablebase, AdmitsMoveOrdering, AdmitsNullMovePruning, AdmitsFutilityPruning, 
+AdmitsKillerMoves, AdmitsDepthReductions, and the like. Now implemet the Searchable trait inside 
+each game module by calling the BasicSearchable methods and modifying the results or inputs or 
+whatever using the optimizations' methods. 
+
+*/
+
 pub(crate) mod searches {
 
     // To hold the code for Negamax, AB, etc until I possibly rearrange things. 
