@@ -1,12 +1,16 @@
 
 // This is just a draft for now.
 
+// HEAVY emphasis that I'm drafting things here. Very likely to be restructured into something more legible.
+
 pub(crate) mod eval_abstracts {
 
     // Different search methods demand different traits from the evaluation functions provided to 
     // them. This is intended to be a place to put those traits for now. 
 
     use std::ops::Neg;
+
+    use super::searches::*;
 
     pub(crate) trait NegamaxCompatible: Ord + Neg {}
 
@@ -15,7 +19,14 @@ pub(crate) mod eval_abstracts {
         type Window: Neg;
         fn window_about(&self, params: Self::WindowParams) -> Self::Window;
         fn in_window(&self, window: Self::Window) -> bool;
-        fn widen(window: Self::Window) -> Self::Window; // in case all continuations get pruned
+        fn widen(window: Self::Window) -> Self::Window; // In case all continuations get pruned. 
+        // Maybe extend to widen_up and widen_down later. 
+    }
+
+    pub(crate) trait IncrementallyUpdatingEvaluator: ABCompatible {
+        type GamestateRep: PseudolegalGeneratingGamestate;
+        fn raw_calculate_eval(pos_in: &Self::GamestateRep) -> Self;
+        fn update_eval(&self, pos_in: &Self::GamestateRep, move_in: &<Self::GamestateRep as PseudolegalGeneratingGamestate>::MoveRep) -> Self;
     }
 }
 
