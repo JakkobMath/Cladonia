@@ -12,9 +12,22 @@ pub(crate) mod eval_abstracts {
 
     use super::searches::*;
 
-    pub(crate) trait NegamaxCompatible: Ord + Neg {}
+    // Required for any eval
 
-    pub(crate) trait ABCompatible: Ord + Neg {
+    pub(crate) trait Evaluates {
+        type GamestateRep: PseudolegalGeneratingGamestate;
+        fn get_evaluation(pos_in: &Self::GamestateRep) -> Self;
+    }
+
+    // Todo: figure out whether it's more elegant to treat evaluators that have multiple levels 
+    // differently here, or just build it into the searches. Probably that's something to build 
+    // into the search. 
+
+    // Traits to capture compatibility with different searches
+
+    pub(crate) trait NegamaxCompatible: Ord + Neg + Evaluates {}
+
+    pub(crate) trait ABCompatible: Ord + Neg + Evaluates {
         type WindowParams: Default;
         type Window: Neg;
         fn window_about(&self, params: Self::WindowParams) -> Self::Window;
@@ -23,10 +36,10 @@ pub(crate) mod eval_abstracts {
         // Maybe extend to widen_up and widen_down later. 
     }
 
-    pub(crate) trait IncrementallyUpdatingEvaluator: ABCompatible {
-        type GamestateRep: PseudolegalGeneratingGamestate;
-        fn raw_calculate_eval(pos_in: &Self::GamestateRep) -> Self;
-        fn update_eval(&self, pos_in: &Self::GamestateRep, move_in: &<Self::GamestateRep as PseudolegalGeneratingGamestate>::MoveRep) -> Self;
+    // Traits to affect what happens to the generated moves
+
+    pub(crate) trait IncrementallyUpdatingEvaluator: Evaluates {
+        fn update_eval(&self, pos_in: &Self::GamestateRep, move_in: &<Self::GamestateRep as UpdatesOnMove>::MoveRep) -> Self;
     }
 }
 
@@ -75,23 +88,22 @@ pub(crate) mod searches {
     // To hold the code for Negamax, AB, etc until I possibly rearrange things. 
     // Also search abstracts.
 
-    pub(crate) trait BasicGamestate: Copy {
-        type MoveRep;
+    // Traits for gamestate representaiton types. 
 
-        fn get_legal_moves(&self) -> Vec<Self::MoveRep>;
+    pub(crate) trait UpdatesOnMove: Copy {
+        type MoveRep;
 
         fn make_move(&mut self, legal_move: Self::MoveRep) -> ();
         fn after_move(&self, legal_move: Self::MoveRep) -> Self;
     }
 
-    pub(crate) trait PseudolegalGeneratingGamestate: Copy {
-        type MoveRep;
+    pub(crate) trait BasicGamestate: UpdatesOnMove {
+        fn get_legal_moves(&self) -> Vec<Self::MoveRep>;
+    }
 
+    pub(crate) trait PseudolegalGeneratingGamestate: UpdatesOnMove {
         fn get_pseudolegal_moves(&self) -> Vec<Self::MoveRep>;
         fn check_remaining_legality(&self, pseudolegal_move: Self::MoveRep) -> bool;
-
-        fn make_move(&mut self, legal_move: Self::MoveRep) -> ();
-        fn after_move(&self, legal_move: Self::MoveRep) -> Self;
     }
 
 }
