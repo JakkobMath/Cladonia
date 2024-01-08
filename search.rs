@@ -15,7 +15,7 @@ pub(crate) mod eval_abstracts {
     // Required for any eval
 
     pub(crate) trait Evaluates {
-        type GamestateRep: PseudolegalGeneratingGamestate;
+        type GamestateRep: PseudolegalGeneratingGamestate; // Todo: make some trait unifying different varieties of gamestate representations
         fn get_evaluation(pos_in: &Self::GamestateRep) -> Self;
     }
 
@@ -90,6 +90,8 @@ pub(crate) mod searches {
 
     // Traits for gamestate representaiton types. 
 
+    use super::eval_abstracts::Evaluates;
+
     pub(crate) trait UpdatesOnMove: Copy {
         type MoveRep;
 
@@ -104,6 +106,16 @@ pub(crate) mod searches {
     pub(crate) trait PseudolegalGeneratingGamestate: UpdatesOnMove {
         fn get_pseudolegal_moves(&self) -> Vec<Self::MoveRep>;
         fn check_remaining_legality(&self, pseudolegal_move: Self::MoveRep) -> bool;
+    }
+
+    // Traits for search trees
+
+    pub(crate) trait IterativelySearches {
+        type Evaluator: Evaluates;
+        fn continue_search(&mut self) -> ();
+        fn move_from_root(&mut self, move_to_make: <<Self::Evaluator as Evaluates>::GamestateRep as UpdatesOnMove>::MoveRep) -> ();
+        fn get_root(&self) -> <Self::Evaluator as Evaluates>::GamestateRep;
+        fn build_from_position(position: <Self::Evaluator as Evaluates>::GamestateRep) -> Self;
     }
 
 }
