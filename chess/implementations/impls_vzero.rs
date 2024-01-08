@@ -4,6 +4,9 @@
 
 use super::*;
 
+// First: some basic unoptimized types for holding chess data that are hopefully better than the 
+// naive implementation one might come up with using abstracts::helper_types.
+
 // Colored for i8.
 // Pairing 0 and 1 together, 2 and 3, and so forth. Last bit is color info.
 impl Colored for i8 {
@@ -308,16 +311,18 @@ impl FENnec for UnwrappedFen {
     }
 }
 
+// Probably the most important position to have on hand.
+
 pub(crate) const STARTPOS: UnwrappedFen = UnwrappedFen {
     board: [
-            6,  2,  4,  8, 10,  4,  2,  6, 
-            0,  0,  0,  0,  0,  0,  0,  0, 
+        6,  2,  4,  8, 10,  4,  2,  6, 
+        0,  0,  0,  0,  0,  0,  0,  0, 
         -1, -1, -1, -1, -1, -1, -1, -1, 
         -1, -1, -1, -1, -1, -1, -1, -1, 
         -1, -1, -1, -1, -1, -1, -1, -1, 
         -1, -1, -1, -1, -1, -1, -1, -1, 
-            1,  1,  1,  1,  1,  1,  1,  1, 
-            7,  3,  5,  9, 11,  5,  3,  7, 
+        1,  1,  1,  1,  1,  1,  1,  1, 
+        7,  3,  5,  9, 11,  5,  3,  7, 
     ],
     moving_side: EnumColor::White,
     ply_count: 0,
@@ -352,6 +357,10 @@ pub(crate) const STARTPOS: UnwrappedFen = UnwrappedFen {
     w_king_square: 4,
     b_king_square: 56 + 4,
 };
+
+// It's crucial for debugging that things start implementing ToString and Display. Perhaps this 
+// code will be moved out to another spot later, but I'm not doing that quite yet because the 
+// *parser* for UnwrappedFen isn't fully general (it can only handle standard castling rules). 
 
 impl ToString for EnumRank {
     fn to_string(&self) -> String {
@@ -455,6 +464,8 @@ impl std::fmt::Display for ChessMove<i8, i8> {
     }
 }
 
+// Movegen and perft code. 
+
 fn legal_successor_positions(fen: UnwrappedFen) -> Vec<UnwrappedFen> {
     let mut successors = Vec::new();
     for legal_move in fen.get_legal_proper_moves() {
@@ -501,6 +512,9 @@ pub(crate) fn depth_n_better_perft(fen: UnwrappedFen, n: i8) -> (usize, Vec<(Che
     (grand_total, sub_perfts)
 }
 
+// Code for parsing a true FEN string into an UnwrappedFen. 
+
+// For the finite state machine I'll be using to parse FENs. 
 enum FenInterpretationState {
     ReadingPieces(i8),
     ReadingColor,
@@ -511,6 +525,9 @@ enum FenInterpretationState {
     ReadingFullMove(i16),
 }
 
+// Necessary because UnwrappedFen reads off rows in reverse order from what's canonical for FENs. 
+// I'll probably change conventions for the next version in an impls_vone module to avoid this and 
+// improve readability. 
 fn vertical_flip_index(square: i8) -> i8 {
     let original_rank = square.get_rank();
     let file = square.get_file();
@@ -527,17 +544,24 @@ fn vertical_flip_index(square: i8) -> i8 {
     i8::build_square(new_rank, file)
 }
 
+// *Apparently* this isn't in the standard library for Rust. It's fine, I need like zero fancy 
+// functionality from it- only so I can separate some distinct but related blocks of code without 
+// breaking the dependency of one on the other. 
 enum Either<L, R> {
     Left(L),
     Right(R),
 }
 
+// The finite state machine for parsing FENs. This may accept non-FEN strings, but should always 
+// parse valid FEN strings correctly. 
 #[allow(dead_code)]
 pub(crate) fn interpret_fen(fen_str: String) -> Result<UnwrappedFen, String> {
-    // State machine?
+
+    // Data needed to produce an UnwrappedFen, mostly with invalid default values. The real values 
+    // will be filled out by the state machine, which will return an error message if something 
+    // goes wrong or not all the necessary pieces of data are changed. 
     let mut board_state = [-1i8; 64];
     let mut color = None;
-    let mut curr_state = FenInterpretationState::ReadingPieces(0);
     let mut w_king_square = -1i8;
     let mut b_king_square = -1i8;
     let mut castle_rules = [None, None, None, None];
@@ -545,10 +569,22 @@ pub(crate) fn interpret_fen(fen_str: String) -> Result<UnwrappedFen, String> {
     let mut half_moves = 0i8;
     let mut full_moves = 0i16;
 
+    // The mutable state variable. 
+    let mut curr_state = FenInterpretationState::ReadingPieces(0);
+
+    // Read in the characters of the FEN string one at a time. FENs canonically list out their 
+    // data in a certain order with spaces as separators and sometimes '-' characters that 
+    // effectively just improve the visibility of empty fields for humans. The states correspond 
+    // to the different kinds of data we might be reading at the moment, and we generally move to 
+    // the next state after encountering a space. 
     for character in fen_str.chars() {
-        // println!("Processing character \"{}\"", character);
         match curr_state {
             FenInterpretationState::ReadingPieces(square_index) => {
+
+                // We will either read in a piece (left) or an instruction to skip some number of 
+                // empty squares (right). Sprinkled throughout are line separators which we ignore 
+                // under the assumption that the FEN string is correctly formatted, with a space 
+                // indicating transition to the next state. 
                 let read_result = match character {
                     'P' => Either::Left(i8::build_piece(
                         EnumColor::White, 
@@ -641,6 +677,12 @@ pub(crate) fn interpret_fen(fen_str: String) -> Result<UnwrappedFen, String> {
                 };
             },
             FenInterpretationState::ReadingCastling => {
+
+                // This is the least general part of the parser: it will only construct 
+                // UnwrappedFENs where the castling rules send kings to the C or G files and 
+                // Rooks to the D or F files. This establishes a convention that the four entries 
+                // of the UnwrappedFEN castling rules array represent kingside castling first and 
+                // then queenside, but I have no plans to ever use this as an assumption. 
                 match character {
                     'K' => castle_rules[0] = Some((
                         i8::build_square(EnumRank::One, EnumFile::E),
@@ -672,6 +714,11 @@ pub(crate) fn interpret_fen(fen_str: String) -> Result<UnwrappedFen, String> {
                 }
             },
             FenInterpretationState::ReadingEPFile => {
+
+                // Ignore the empty field character completely. If we can detect a valid file, 
+                // move to looking for the rank next. Any invalid character (canonically this 
+                // should only ever be a space for valid FENs) sends us to the next state. 
+
                 let try_ep_file = match character {
                     'a' => Some(EnumFile::A),
                     'b' => Some(EnumFile::B),
@@ -692,6 +739,12 @@ pub(crate) fn interpret_fen(fen_str: String) -> Result<UnwrappedFen, String> {
                 }
             },
             FenInterpretationState::ReadingEPRank(ep_file) => {
+
+                // We only ever end up here if we read in a valid ep_file, which is passed 
+                // in as part of the state data to ensure that we have access to it without 
+                // making a dedicated mutable variable to hold it up with the FEN data 
+                // we've been writing to. 
+
                 let try_ep_rank = match character {
                     '1' => Some(EnumRank::One),
                     '2' => Some(EnumRank::Two),
@@ -710,6 +763,13 @@ pub(crate) fn interpret_fen(fen_str: String) -> Result<UnwrappedFen, String> {
                 curr_state = FenInterpretationState::ReadingHalfMove(0)
             },
             FenInterpretationState::ReadingHalfMove(prev_digits) => {
+
+                // Halfmoves and full moves are given as base-10 numbers, so we need some memory 
+                // as part of the state to hold whatever number is currently in the digit-reading 
+                // accumulator thing. If we can read in another digit the prev_digits are 
+                // reinterpreted as being one more base-10 place to the left than on the previous 
+                // step. Overflows are possible, but not by passing in a FEN string that arises 
+                // from a legal game of chess starting at the canonical startpos or a 960 position. 
                 match character {
                     ' ' => {
                         half_moves = prev_digits;
@@ -724,6 +784,10 @@ pub(crate) fn interpret_fen(fen_str: String) -> Result<UnwrappedFen, String> {
                 }
             },
             FenInterpretationState::ReadingFullMove(prev_digits) => {
+
+                // See the half move description. The difference here is that we need to store the 
+                // accumulator at each step since we aren't sure when the string will end and we 
+                // don't get a terminating space. 
                 match character.to_digit(10) {
                     None => return Err("Unexpected character when trying to read fullmove count.".to_string()),
                     Some(digit) => {
@@ -734,6 +798,9 @@ pub(crate) fn interpret_fen(fen_str: String) -> Result<UnwrappedFen, String> {
             },
         }
     }
+
+    // Apologies for the braces here. This code just makes sure 
+    // each piece of the FEN we're building is valid. 
     match color {
         None => Err("Color is somehow missing.".to_string()),
         Some(true_color) => {
@@ -765,3 +832,22 @@ pub(crate) fn interpret_fen(fen_str: String) -> Result<UnwrappedFen, String> {
         }
     }
 }
+
+// Some very basic search/evaluator code. Probably this file gets broken up 
+// into multiple modules and then multiple files. 
+
+// MVVLVA (most valuable victim, least valuable attacker) is used to get a 
+// basic move ordering to work for an AB search. 
+
+// TODO: MVVLVA
+
+// Pretty much the most naive evaluation short of literally just guessing. 
+
+// TODO: material difference in centipawns, bishop = 3.1. Not even any king
+// safety stuff yet, just get any kind of search working first. 
+
+// TODO: implement Evaluator etc for that evaluation. 
+
+// TODO: figure out a basic data structure to hold a search tree where leaf nodes are readily 
+// accessible, and implement Searches for it using the evaluator above and AB search. Maybe 
+// do negamax first. 
