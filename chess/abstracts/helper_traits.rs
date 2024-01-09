@@ -632,10 +632,10 @@ pub(crate) trait FENnec: HasBoard + Colored + PlyCounting + MoveCounting + Sized
         self.sees_obvious_attack(self.get_opposite_color(), relevant_king_square)
     }
     fn is_stalemate(&self) -> bool {
-        self.get_legal_proper_moves().len() == 1 && !self.mover_in_check()
+        self.get_legal_proper_moves().len() == 0 && !self.mover_in_check()
     }
     fn is_checkmate(&self) -> bool {
-        self.get_legal_proper_moves().len() == 0
+        self.get_legal_proper_moves().len() == 0 && self.mover_in_check()
     }
 
     fn is_pinned(&self, square: Self::PositionRep) -> bool {
