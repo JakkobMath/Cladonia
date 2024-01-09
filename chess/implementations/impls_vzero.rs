@@ -839,6 +839,63 @@ pub(crate) fn interpret_fen(fen_str: String) -> Result<UnwrappedFen, String> {
 // MVVLVA (most valuable victim, least valuable attacker) is used to get a 
 // basic move ordering to work for an AB search. 
 
+fn get_piece_value(piece: EnumPiecesUncolored) -> i16 {
+    match piece {
+        EnumPiecesUncolored::Pawn => 100,
+        EnumPiecesUncolored::Knight => 300,
+        EnumPiecesUncolored::Bishop => 310,
+        EnumPiecesUncolored::Rook => 500,
+        EnumPiecesUncolored::Queen => 900,
+        EnumPiecesUncolored::King => 1900,
+    }
+}
+
+fn naive_evaluation(position: &UnwrappedFen) -> i16 {
+    let mut sum = 0;
+    for square_index in 0..64 {
+        match position.board[square_index].get_contents() {
+            None => {},
+            Some(piece) => {
+                sum += get_piece_value(piece.get_piece_type()) * match piece.get_color() {
+                    EnumColor::Black => -1,
+                    EnumColor::White => 1,
+                }
+            },
+        }
+    }
+    sum
+}
+
+// Higher score -> put move earlier. 
+// Not doing anything fancy yet- basically just raw naive MVV-LVA with some special cases. 
+// Might add in a forward movement bonus later or something. ... maybe just adding it now. 
+fn mvv_lva_score(position: &UnwrappedFen, move_to_make: <UnwrappedFen as HasBoard>::MoveRep) -> i16 {
+    match move_to_make {
+        ChessMove::NullMove => 0,
+        ChessMove::StandardMove(some_standard_move) => {
+            20 * match position.query_square(some_standard_move.to_square).get_contents() {
+                None => 0,
+                Some(piece) => get_piece_value(piece.get_piece_type()),
+            } - match position.query_square(some_standard_move.from_square).get_contents() {
+                None => 0,
+                Some(piece) => get_piece_value(piece.get_piece_type()),
+            } + (some_standard_move.to_square.rank_gap(&some_standard_move.from_square) as i16)
+        },
+        ChessMove::EnPassantMove(_ep_move) => 1950,
+        ChessMove::CastlingMove(_castling_move) => 4050, 
+        ChessMove::PromotionMove(some_promotion_move) => {
+            20 * match position.query_square(some_promotion_move.to_square).get_contents() {
+                None => 0,
+                Some(piece) => get_piece_value(piece.get_piece_type()),
+            } + 300 + get_piece_value(some_promotion_move.promotion_choice.get_piece_type()) * 2 
+            // -100 for pawn lost, + 500 * (1-x) to pull towards rough average of promotion 
+            // values, + x * get_piece_value(piece) for weighting higher-value promotions more 
+            // highly, x = 1/2. All that times 4. Promoting isn't as urgent as a capture perhaps, 
+            // but probably more so than a normal move. This either gets discarded or tuned later. 
+        },
+    }
+}
+
 // TODO: MVVLVA
 
 // Pretty much the most naive evaluation short of literally just guessing. 
