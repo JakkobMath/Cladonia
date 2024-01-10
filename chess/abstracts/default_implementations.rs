@@ -13,14 +13,17 @@
 use super::{helper_types::*,helper_traits::*};
 
 impl Colored for EnumColor {
+    #[inline(always)]
     fn get_color(&self) -> EnumColor {
         *self
     }
 
+    #[inline(always)]
     fn set_color(&mut self, color: EnumColor) -> () {
         *self = color;
     }
 
+    #[inline(always)]
     fn get_opposite_color(&self) -> EnumColor {
         match *self {
             EnumColor::White => EnumColor::Black,
@@ -36,26 +39,32 @@ struct RawPieceRep {
 }
 
 impl Colored for RawPieceRep {
+    #[inline(always)]
     fn get_color(&self) -> EnumColor {
         self.color.get_color()
     }
+    #[inline(always)]
     fn set_color(&mut self, color: EnumColor) -> () {
         self.color.set_color(color)
     }
+    #[inline(always)]
     fn get_opposite_color(&self) -> EnumColor {
         self.color.get_opposite_color()
     }
 }
 
 impl Piecey for RawPieceRep {
+    #[inline(always)]
     fn get_piece_type(&self) -> EnumPiecesUncolored {
         self.piece_type
     }
 
+    #[inline(always)]
     fn build_piece(piece_color: EnumColor, piece_type: EnumPiecesUncolored) -> Self {
         RawPieceRep {color: piece_color, piece_type: piece_type}
     }
 
+    #[inline(always)]
     fn set_piece_type(&mut self, piece_type: EnumPiecesUncolored) -> () {
         self.piece_type = piece_type
     }
@@ -63,21 +72,26 @@ impl Piecey for RawPieceRep {
 
 impl<T: Piecey> Contentsy for Option<T> {
     type Content = T;
+    #[inline(always)]
     fn get_contents(&self) -> Option<Self::Content> {
         *self
     }
+    #[inline(always)]
     fn build_contents(contents: Option<Self::Content>) -> Self {
         contents
     }
 }
 
 impl Ranked for EnumRank {
+    #[inline(always)]
     fn get_rank(&self) -> EnumRank {
         *self
     }
+    #[inline(always)]
     fn set_rank(&mut self, rank: EnumRank) -> () {
         *self = rank
     }
+    #[inline(always)]
     fn rank_shift(&self, shift: SmallOffset) -> Option<Self> {
         let rank_number: i8 = match *self {
             EnumRank::One => 0,
@@ -108,6 +122,7 @@ impl Ranked for EnumRank {
             _ => None
         }
     }
+    #[inline(always)]
     fn rank_gap(&self, other_rank: &Self) -> i8 {
         let rank_number: i8 = match *self {
             EnumRank::One => 0,
@@ -134,12 +149,15 @@ impl Ranked for EnumRank {
 }
 
 impl Filed for EnumFile {
+    #[inline(always)]
     fn get_file(&self) -> EnumFile {
         *self
     }
+    #[inline(always)]
     fn set_file(&mut self, file: EnumFile) -> () {
         *self = file
     }
+    #[inline(always)]
     fn file_shift(&self, shift: SmallOffset) -> Option<Self> {
         let file_number:i8 = match *self {
             EnumFile::A => 0,
@@ -170,6 +188,7 @@ impl Filed for EnumFile {
             _ => None
         }
     }
+    #[inline(always)]
     fn file_gap(&self, other_file: &Self) -> i8 {
         let file_number:i8 = match *self {
             EnumFile::A => 0,
@@ -202,9 +221,11 @@ struct RawSquareRep {
 }
 
 impl Ranked for RawSquareRep {
+    #[inline(always)]
     fn get_rank(&self) -> EnumRank {
         self.rank
     }
+    #[inline(always)]
     fn set_rank(&mut self, rank: EnumRank) -> () {
         self.rank = rank
     }
@@ -226,18 +247,22 @@ impl PartialOrd for RawSquareRep {
 }
 
 impl Filed for RawSquareRep {
+    #[inline(always)]
     fn get_file(&self) -> EnumFile {
         self.file
     }
+    #[inline(always)]
     fn set_file(&mut self, file: EnumFile) -> () {
         self.file = file
     }
 }
 
 impl Squarey for RawSquareRep {
+    #[inline(always)]
     fn set_square(&mut self, rank: EnumRank, file: EnumFile) -> () {
         *self = RawSquareRep {rank: rank, file: file}
     }
+    #[inline(always)]
     fn build_square(rank: EnumRank, file: EnumFile) -> Self {
         RawSquareRep { rank: rank, file: file }
     }
@@ -266,12 +291,15 @@ where SquareRep: Squarey {
 
 impl<PositionRep, PieceRep> Movey<PositionRep, PieceRep> for ChessMove<PositionRep, PieceRep>
 where PositionRep: Squarey, PieceRep: Piecey {
+    #[inline(always)]
     fn get_move(&self) -> ChessMove<PositionRep, PieceRep> {
         *self
     }
+    #[inline(always)]
     fn set_move(&mut self, new_move: ChessMove<PositionRep, PieceRep>) -> () {
         *self = new_move
     }
+    #[inline(always)]
     fn build_move(new_move: ChessMove<PositionRep, PieceRep>) -> Self {
         new_move
     }

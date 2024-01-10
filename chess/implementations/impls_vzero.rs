@@ -10,12 +10,14 @@ use super::*;
 // Colored for i8.
 // Pairing 0 and 1 together, 2 and 3, and so forth. Last bit is color info.
 impl Colored for i8 {
+    #[inline(always)]
     fn get_color(&self) -> crate::chess::abstracts::helper_types::EnumColor {
         match self % 2i8 {
             0i8 => EnumColor::White,
             _ => EnumColor::Black,
         }
     }
+    #[inline(always)]
     fn set_color(&mut self, color: EnumColor) -> () {
         *self = 2i8 * (*self / 2i8) + match color {
             EnumColor::White => 0i8,
@@ -26,6 +28,7 @@ impl Colored for i8 {
 
 // Piecey for i8.
 impl Piecey for i8 {
+    #[inline(always)]
     fn get_piece_type(&self) -> EnumPiecesUncolored {
         match self / 2i8 {
             0i8 => EnumPiecesUncolored::Pawn,
@@ -36,6 +39,7 @@ impl Piecey for i8 {
             _ => EnumPiecesUncolored::King,
         }
     }
+    #[inline(always)]
     fn build_piece(piece_color: EnumColor, piece_type: EnumPiecesUncolored) -> Self {
         2i8 * match piece_type {
             EnumPiecesUncolored::Pawn => 0i8,
@@ -54,12 +58,14 @@ impl Piecey for i8 {
 // Contentsy for i8.
 impl Contentsy for i8 {
     type Content = i8;
+    #[inline(always)]
     fn get_contents(&self) -> Option<Self::Content> {
         match *self < 0i8 {
             true => None,
             false => Some(*self),
         }
     }
+    #[inline(always)]
     fn build_contents(contents: Option<Self::Content>) -> Self {
         match contents {
             None => -1i8,
@@ -71,6 +77,7 @@ impl Contentsy for i8 {
 // Ranked for i8.
 // Rank is stored in the penultimate three bits.
 impl Ranked for i8 {
+    #[inline(always)]
     fn get_rank(&self) -> EnumRank {
         match (*self / 8) % 8 {
             0 => EnumRank::One,
@@ -83,6 +90,7 @@ impl Ranked for i8 {
             _ => EnumRank::Eight,
         }
     }
+    #[inline(always)]
     fn set_rank(&mut self, rank: EnumRank) -> () {
         *self = 8 * match rank {
             EnumRank::One => 0,
@@ -100,6 +108,7 @@ impl Ranked for i8 {
 // Filed for i8.
 // File is stored in the last three bits.
 impl Filed for i8 {
+    #[inline(always)]
     fn get_file(&self) -> EnumFile {
         match *self % 8 {
             0 => EnumFile::A,
@@ -112,6 +121,7 @@ impl Filed for i8 {
             _ => EnumFile::H,
         }
     }
+    #[inline(always)]
     fn set_file(&mut self, file: EnumFile) -> () {
         *self = 8 * (*self / 8) + match file {
             EnumFile::A => 0,
@@ -128,6 +138,7 @@ impl Filed for i8 {
 
 // Squarey for i8.
 impl Squarey for i8 {
+    #[inline(always)]
     fn build_square(rank: EnumRank, file: EnumFile) -> Self {
         8 * match rank {
             EnumRank::One => 0,
@@ -168,10 +179,12 @@ impl HasBoard for [i8; 64] {
         56, 57, 58, 59, 60, 61, 62, 63, 
     ];
 
+    #[inline(always)]
     fn query_square(&self, square: Self::PositionRep) -> Self::ContentsRep {
         self[square as usize]
     }
 
+    #[inline(always)]
     fn set_square(&mut self, square: Self::PositionRep, new_contents: Self::ContentsRep) -> () {
         self[square as usize] = new_contents;
     }
@@ -179,9 +192,11 @@ impl HasBoard for [i8; 64] {
 
 // PlyCounting for i8.
 impl PlyCounting for i8 {
+    #[inline(always)]
     fn get_ply_count(&self) -> i8 {
         *self
     }
+    #[inline(always)]
     fn set_ply_count(&mut self, ply_count: i8) -> () {
         *self = ply_count;
     }
@@ -189,10 +204,12 @@ impl PlyCounting for i8 {
 
 // MoveCounting for i16.
 impl MoveCounting for i16 {
+    #[inline(always)]
     fn get_move_count(&self) -> i16 {
         *self
     }
 
+    #[inline(always)]
     fn set_move_count(&mut self, move_count: i16) -> () {
         *self = move_count;
     }
@@ -219,38 +236,47 @@ impl HasBoard for UnwrappedFen {
 
     const CANONICAL_ARRAY: [Self::PositionRep; 64] = <[i8; 64] as HasBoard>::CANONICAL_ARRAY;
 
+    #[inline(always)]
     fn query_square(&self, square: Self::PositionRep) -> Self::ContentsRep {
         self.board.query_square(square)
     }
+    #[inline(always)]
     fn set_square(&mut self, square: Self::PositionRep, new_contents: Self::ContentsRep) -> () {
         self.board.set_square(square, new_contents);
     }
 }
 impl Colored for UnwrappedFen {
+    #[inline(always)]
     fn get_color(&self) -> EnumColor {
         self.moving_side
     }
+    #[inline(always)]
     fn set_color(&mut self, color: EnumColor) -> () {
         self.moving_side = color;
     }
 }
 impl PlyCounting for UnwrappedFen {
+    #[inline(always)]
     fn get_ply_count(&self) -> i8 {
         self.ply_count.get_ply_count()
     }
+    #[inline(always)]
     fn set_ply_count(&mut self, ply_count: i8) -> () {
         self.ply_count.set_ply_count(ply_count)
     }
 }
 impl MoveCounting for UnwrappedFen {
+    #[inline(always)]
     fn get_move_count(&self) -> i16 {
         self.move_count.get_move_count()
     }
+    #[inline(always)]
     fn set_move_count(&mut self, move_count: i16) -> () {
         self.move_count.set_move_count(move_count)
     }
 }
 impl FENnec for UnwrappedFen {
+    #[inline(always)]
     fn get_castling(&self, color: EnumColor) -> [Option<CastlingMove<Self::PositionRep>>; 2] {
         let offset = match color {
             EnumColor::White => 0,
@@ -267,6 +293,7 @@ impl FENnec for UnwrappedFen {
         }
         castle_rules
     }
+    #[inline(always)]
     fn set_castling(&mut self, color: EnumColor, new_rules: [Option<CastlingMove<Self::PositionRep>>; 2]) -> () {
         let offset = match color {
             EnumColor::White => 0,
@@ -281,18 +308,23 @@ impl FENnec for UnwrappedFen {
             }
         }
     }
+    #[inline(always)]
     fn get_w_king_square(&self) -> Self::PositionRep {
         self.w_king_square
     }
+    #[inline(always)]
     fn set_w_king_square(&mut self, square: Self::PositionRep) -> () {
         self.w_king_square = square;
     }
+    #[inline(always)]
     fn get_b_king_square(&self) -> Self::PositionRep {
         self.b_king_square
     }
+    #[inline(always)]
     fn set_b_king_square(&mut self, square: Self::PositionRep) -> () {
         self.b_king_square = square;
     }
+    #[inline(always)]
     fn try_get_ep_square(&self) -> Option<(Self::PositionRep, Self::PositionRep)> {
         let ep_to_taken = match self.get_color() {
             EnumColor::White => -8,
@@ -303,6 +335,7 @@ impl FENnec for UnwrappedFen {
             false => Some((self.ep_data + ep_to_taken, self.ep_data))
         }
     }
+    #[inline(always)]
     fn set_ep_square(&mut self, value: Option<(Self::PositionRep, Self::PositionRep)>) -> () {
         match value {
             None => self.ep_data = -1,
@@ -363,6 +396,7 @@ pub(crate) const STARTPOS: UnwrappedFen = UnwrappedFen {
 // *parser* for UnwrappedFen isn't fully general (it can only handle standard castling rules). 
 
 impl ToString for EnumRank {
+    #[inline(always)]
     fn to_string(&self) -> String {
         match *self {
             EnumRank::One => (*"1").to_string(),
@@ -378,6 +412,7 @@ impl ToString for EnumRank {
 }
 
 impl ToString for EnumFile {
+    #[inline(always)]
     fn to_string(&self) -> String {
         match *self {
             EnumFile::A => (*"A").to_string(),
@@ -397,6 +432,7 @@ pub(crate) struct StandardSquare {
     file: EnumFile,
 }
 
+#[inline(always)]
 pub(crate) fn standardize<SquareRep: Squarey> (square: SquareRep) -> StandardSquare {
     StandardSquare {
         rank: square.get_rank(),
@@ -405,6 +441,7 @@ pub(crate) fn standardize<SquareRep: Squarey> (square: SquareRep) -> StandardSqu
 }
 
 impl ToString for StandardSquare {
+    #[inline(always)]
     fn to_string(&self) -> String {
         let rank_string = self.rank.to_string();
         let mut square_string = self.file.to_string();
@@ -414,6 +451,7 @@ impl ToString for StandardSquare {
 }
 
 impl ToString for EnumPiecesUncolored {
+    #[inline(always)]
     fn to_string(&self) -> String {
         match *self {
             Self::Pawn => (*"").to_string(),
@@ -528,6 +566,7 @@ enum FenInterpretationState {
 // Necessary because UnwrappedFen reads off rows in reverse order from what's canonical for FENs. 
 // I'll probably change conventions for the next version in an impls_vone module to avoid this and 
 // improve readability. 
+#[inline(always)]
 fn vertical_flip_index(square: i8) -> i8 {
     let original_rank = square.get_rank();
     let file = square.get_file();

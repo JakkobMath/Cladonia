@@ -38,6 +38,7 @@ pub(crate) trait Piecey: Colored + Sized + Copy {
 pub(crate) trait Contentsy: Sized + Copy {
     type Content: Piecey;
     fn get_contents(&self) -> Option<Self::Content>;
+    #[inline(always)]
     fn set_contents(&mut self, contents: Option<Self::Content>) -> () {
         *self = Self::build_contents(contents)
     }
@@ -51,6 +52,7 @@ pub(crate) trait Contentsy: Sized + Copy {
 pub(crate) trait Ranked: Sized + Copy {
     fn get_rank(&self) -> EnumRank;
     fn set_rank(&mut self, rank: EnumRank) -> ();
+    #[inline(always)]
     fn rank_shift(&self, shift: SmallOffset) -> Option<Self> {
         match self.get_rank().rank_shift(shift) {
             None => None,
@@ -62,6 +64,7 @@ pub(crate) trait Ranked: Sized + Copy {
         }
     }
     // The EnumRank type overloads this to do something. 
+    #[inline(always)]
     fn rank_gap(&self, other_rank: &Self) -> i8 {
         self.get_rank().rank_gap(&other_rank.get_rank())
     }
@@ -71,6 +74,7 @@ pub(crate) trait Ranked: Sized + Copy {
 pub(crate) trait Filed: Sized + Copy + PartialOrd {
     fn get_file(&self) -> EnumFile;
     fn set_file(&mut self, file: EnumFile) -> ();
+    #[inline(always)]
     fn file_shift(&self, shift: SmallOffset) -> Option<Self> {
         match self.get_file().file_shift(shift) {
             None => None,
@@ -82,6 +86,7 @@ pub(crate) trait Filed: Sized + Copy + PartialOrd {
         }
     }
     // Overloaded by the EnumFile type. 
+    #[inline(always)]
     fn file_gap(&self, other_file: &Self) -> i8 {
         self.get_file().file_gap(&other_file.get_file())
     }
@@ -94,26 +99,31 @@ pub(crate) trait Filed: Sized + Copy + PartialOrd {
 // lifting in the movegen code later, such as getting pseudolegal <piece> moves out of 
 // the square being described. 
 pub(crate) trait Squarey: Ranked + Filed {
+    #[inline(always)]
     fn set_square(&mut self, rank: EnumRank, file: EnumFile) -> () {
         self.set_file(file);
         self.set_rank(rank);
     }
     fn build_square(rank: EnumRank, file: EnumFile) -> Self;
+    #[inline(always)]
     fn try_get_offset_square(&self, rank_offset: SmallOffset, file_offset: SmallOffset) -> Option<Self> {
         match self.rank_shift(rank_offset) {
             None => None,
             Some(new_square) => new_square.file_shift(file_offset),
         }
     }
+    #[inline(always)]
     fn generate_ray(&self, rank_offset: SmallOffset, file_offset: SmallOffset) -> Ray<Self, (SmallOffset, SmallOffset)> {
         Ray {
             curr_pos: *self,
             direction: (rank_offset, file_offset),
         }
     }
+    #[inline(always)]
     fn get_offset(&self, other_square: Self) -> (i8, i8) {
         (self.rank_gap(&other_square), self.file_gap(&other_square))
     }
+    #[inline(always)]
     fn try_get_ray_to(&self, other_square: Self) -> Option<Ray<Self, (SmallOffset, SmallOffset)>> {
         let (rank_offset, file_offset) = self.get_offset(other_square);
         match rank_offset == 0 {
@@ -165,6 +175,7 @@ pub(crate) trait Squarey: Ranked + Filed {
             }
         }
     }
+    #[inline(always)]
     fn try_get_ray_away(&self, other_square: Self) -> Option<Ray<Self, (SmallOffset, SmallOffset)>> {
         let (rank_offset, file_offset) = self.get_offset(other_square);
         match rank_offset == 0 {
@@ -273,6 +284,7 @@ where PositionRep: Squarey, PieceRep: Piecey,
     fn get_move(&self) -> ChessMove<PositionRep, PieceRep>;
     fn set_move(&mut self, new_move: ChessMove<PositionRep, PieceRep>) -> ();
     fn build_move(new_move: ChessMove<PositionRep, PieceRep>) -> Self;
+    #[inline(always)]
     fn is_proper(&self) -> bool {
         match self.get_move() {
             ChessMove::NullMove => false,
@@ -503,6 +515,7 @@ pub(crate) trait HasBoard: Sized + Copy {
     // implement custom NNUE code this would probably also affect the accumulators. 
     // This version copies the new position to another place and retains the original, 
     // the one beneath it alters the original in place. 
+    #[inline(always)]
     fn after_frozen_move(&self, possible_move: Self::MoveRep) -> Self {
         let mut after_pos = *self;
         after_pos.frozen_make_move(possible_move);
@@ -551,13 +564,16 @@ pub(crate) trait HasBoard: Sized + Copy {
 pub(crate) trait PlyCounting {
     fn get_ply_count(&self) -> i8;
     fn set_ply_count(&mut self, ply_count: i8) -> ();
+    #[inline(always)]
     fn reset_ply_counter(&mut self) {
         self.set_ply_count(0)
     }
+    #[inline(always)]
     fn increment_ply(&mut self) {
         let new_count = self.get_ply_count().max(49) + 1;
         self.set_ply_count(new_count)
     }
+    #[inline(always)]
     fn time_up(&self) -> bool {
         self.get_ply_count() == 50
     }
@@ -568,6 +584,7 @@ pub(crate) trait PlyCounting {
 pub(crate) trait MoveCounting {
     fn get_move_count(&self) -> i16;
     fn set_move_count(&mut self, move_count: i16) -> ();
+    #[inline(always)]
     fn increment_move(&mut self) {
         self.set_move_count(self.get_move_count() + 1)
     }
@@ -581,6 +598,7 @@ pub(crate) trait MoveCounting {
 pub(crate) trait FENnec: HasBoard + Colored + PlyCounting + MoveCounting + Sized + Copy {
     fn get_castling(&self, color: EnumColor) -> [Option<CastlingMove<Self::PositionRep>>; 2];
     fn set_castling(&mut self, color: EnumColor, new_rules: [Option<CastlingMove<Self::PositionRep>>; 2]) -> ();
+    #[inline(always)]
     fn remove_castling(&mut self, moved_square: Self::PositionRep) -> () {
         let mut new_rules = self.get_castling(self.get_color());
         for i in [0, 1] {
@@ -595,6 +613,7 @@ pub(crate) trait FENnec: HasBoard + Colored + PlyCounting + MoveCounting + Sized
         }
         self.set_castling(self.get_color(), new_rules);
     }
+    #[inline(always)]
     fn remove_enemy_castling(&mut self, removed_square: Self::PositionRep) -> () {
         let mut new_rules = self.get_castling(self.get_opposite_color());
         for i in [0, 1] {
@@ -616,6 +635,7 @@ pub(crate) trait FENnec: HasBoard + Colored + PlyCounting + MoveCounting + Sized
     fn try_get_ep_square(&self) -> Option<(Self::PositionRep, Self::PositionRep)>;
     fn set_ep_square(&mut self, value: Option<(Self::PositionRep, Self::PositionRep)>) -> ();
 
+    #[inline(always)]
     fn mover_in_check(&self) -> bool {
         let relevant_king_square = match self.get_color() {
             EnumColor::White => self.get_w_king_square(),
@@ -623,6 +643,7 @@ pub(crate) trait FENnec: HasBoard + Colored + PlyCounting + MoveCounting + Sized
         };
         self.sees_obvious_attack(self.get_color(), relevant_king_square)
     }
+    #[inline(always)]
     fn non_mover_in_check(&self) -> bool {
         let relevant_king_square = match self.get_color() {
             EnumColor::White => self.get_b_king_square(),
@@ -631,9 +652,11 @@ pub(crate) trait FENnec: HasBoard + Colored + PlyCounting + MoveCounting + Sized
         // let debug_help = self.sees_obvious_attack(self.get_opposite_color(), relevant_king_square);
         self.sees_obvious_attack(self.get_opposite_color(), relevant_king_square)
     }
+    #[inline(always)]
     fn is_stalemate(&self) -> bool {
         self.get_legal_proper_moves().len() == 0 && !self.mover_in_check()
     }
+    #[inline(always)]
     fn is_checkmate(&self) -> bool {
         self.get_legal_proper_moves().len() == 0 && self.mover_in_check()
     }
@@ -1094,6 +1117,7 @@ pub(crate) trait FENnec: HasBoard + Colored + PlyCounting + MoveCounting + Sized
         probable_moves
     }
     
+    #[inline(always)]
     fn get_legal_proper_moves(&self) -> Vec<Self::MoveRep> {
         let mut legal_moves = Vec::new();
         for possible_move in self.get_pseudo_legal_proper_moves() {
@@ -1104,11 +1128,13 @@ pub(crate) trait FENnec: HasBoard + Colored + PlyCounting + MoveCounting + Sized
         legal_moves
     }
 
+    #[inline(always)]
     fn after_null_move(&self) -> Self {
         let mut position_after = *self;
         position_after.do_null_move();
         position_after
     }
+    #[inline(always)]
     fn do_null_move(&mut self) -> () {
         self.increment_ply();
         if self.get_color() == EnumColor::Black {
@@ -1117,6 +1143,7 @@ pub(crate) trait FENnec: HasBoard + Colored + PlyCounting + MoveCounting + Sized
         self.set_ep_square(None);
         self.set_color(self.get_opposite_color());
     }
+    #[inline(always)]
     fn after_move(&self, possible_move: Self::MoveRep) -> Self {
         let mut position_after = *self;
         position_after.make_move(possible_move);
