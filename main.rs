@@ -54,16 +54,18 @@ fn main() {
     let third_test_pos_two = false;
 
     let pos_3_string = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1".to_string();
-    let trying_pos_3_perft = true;
+    let trying_pos_3_perft = false;
 
     let pos_4_string = "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1".to_string();
-    let trying_pos_4_perft = true;
+    let trying_pos_4_perft = false;
 
     let pos_5_string = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8".to_string();
-    let trying_pos_5_perft = true;
+    let trying_pos_5_perft = false;
 
     let pos_6_string = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10".to_string();
-    let trying_pos_6_perft = true;
+    let trying_pos_6_perft = false;
+
+    let trying_negamax = true;
 
     if trying_startpos_perft {
         println!("Perft from STARTPOS:");
@@ -490,6 +492,16 @@ fn main() {
         }
 
         // No issues at depth 4 :).
+    }
+    if trying_negamax {
+        println!("Starting search of startpos");
+        let mut move_options = STARTPOS.get_legal_proper_moves();
+        move_options.sort_by(|move_to_make, other_move| mvv_lva_score(&STARTPOS, *move_to_make).cmp(&mvv_lva_score(&STARTPOS, *other_move)));
+        for valid_move in move_options {
+            println!("After {}", valid_move);
+            let negamax_results = negamax_best_move(&STARTPOS.after_move(valid_move), 5);
+            println!("Best move found and its evaluation: {0} gives evaluation {1}", negamax_results.0, negamax_results.1)
+        }
     }
 
     // Perft for all tested positions gives correct totals up to depth 4, and startpos is correct to depth 5. 

@@ -850,15 +850,18 @@ fn get_piece_value(piece: EnumPiecesUncolored) -> i16 {
     }
 }
 
-fn naive_evaluation(position: &UnwrappedFen) -> i16 {
+// Pretty much the most naive evaluation short of literally just guessing. 
+// material difference in centipawns, bishop = 3.1. Not even any king
+// safety stuff yet, just get any kind of search working first. 
+fn naive_evaluation_stm(position: &UnwrappedFen) -> i16 {
     let mut sum = 0;
     for square_index in 0..64 {
         match position.board[square_index].get_contents() {
             None => {},
             Some(piece) => {
-                sum += get_piece_value(piece.get_piece_type()) * match piece.get_color() {
-                    EnumColor::Black => -1,
-                    EnumColor::White => 1,
+                sum += get_piece_value(piece.get_piece_type()) * match piece.get_color() == position.get_color() {
+                    false => -1,
+                    true => 1,
                 }
             },
         }
@@ -869,7 +872,7 @@ fn naive_evaluation(position: &UnwrappedFen) -> i16 {
 // Higher score -> put move earlier. 
 // Not doing anything fancy yet- basically just raw naive MVV-LVA with some special cases. 
 // Might add in a forward movement bonus later or something. ... maybe just adding it now. 
-fn mvv_lva_score(position: &UnwrappedFen, move_to_make: <UnwrappedFen as HasBoard>::MoveRep) -> i16 {
+pub(crate) fn mvv_lva_score(position: &UnwrappedFen, move_to_make: <UnwrappedFen as HasBoard>::MoveRep) -> i16 {
     match move_to_make {
         ChessMove::NullMove => 0,
         ChessMove::StandardMove(some_standard_move) => {
@@ -879,7 +882,10 @@ fn mvv_lva_score(position: &UnwrappedFen, move_to_make: <UnwrappedFen as HasBoar
             } - match position.query_square(some_standard_move.from_square).get_contents() {
                 None => 0,
                 Some(piece) => get_piece_value(piece.get_piece_type()),
-            } + (some_standard_move.to_square.rank_gap(&some_standard_move.from_square) as i16)
+            } + (some_standard_move.to_square.rank_gap(&some_standard_move.from_square) as i16) * match position.get_color() {
+                EnumColor::White => 1,
+                EnumColor::Black => -1,
+            }
         },
         ChessMove::EnPassantMove(_ep_move) => 1950,
         ChessMove::CastlingMove(_castling_move) => 4050, 
@@ -896,15 +902,76 @@ fn mvv_lva_score(position: &UnwrappedFen, move_to_make: <UnwrappedFen as HasBoar
     }
 }
 
-// TODO: MVVLVA
+fn negamax_evaluate(position: &UnwrappedFen, depth: i8) -> i16 {
+    match depth <= 0 {
+        true => naive_evaluation_stm(position),
+        false => {
+            let mut valid_moves = position.get_pseudo_legal_proper_moves();
+            valid_moves.sort_by(|move_to_make, other_move| mvv_lva_score(position, *move_to_make).cmp(&mvv_lva_score(position, *other_move)));
 
-// Pretty much the most naive evaluation short of literally just guessing. 
+            let mut score_thus_far = i16::MIN + 1;
 
-// TODO: material difference in centipawns, bishop = 3.1. Not even any king
-// safety stuff yet, just get any kind of search working first. 
+            for hopeful_move in valid_moves {
+                if position.check_remaining_legality(hopeful_move) {
+                    let successor_position = position.after_move(hopeful_move);
+                    let successor_estimated_value = -negamax_evaluate(&successor_position, depth-1);
+
+                    // I probably shouldn't be trying to be fancy, but I kind of want to punish 
+                    // the evaluation if there are move options of similar but slightly lower 
+                    // evaluation. Doing too much work to avoid overflows anywhere. Good thing 
+                    // this gets replaced later. Partly I'm also hoping this functions to fill 
+                    // some of the large gaps we have in the space of possible outputs. 
+                    score_thus_far = match score_thus_far < successor_estimated_value {
+                        true => {
+                            let try_score = successor_estimated_value.max(i16::MIN + 100) - 9 / (successor_estimated_value / 2 - score_thus_far / 2).max(3);
+                            try_score.max(successor_estimated_value + (score_thus_far / 2 - successor_estimated_value / 2) / 6)
+                        },
+                        false => {
+                            let try_score = score_thus_far.max(i16::MIN + 100) - 16 / (score_thus_far / 2 - successor_estimated_value / 2).max(3);
+                            try_score.max(score_thus_far + (successor_estimated_value / 2 - score_thus_far / 2) / 8)
+                        }
+                    }
+                }
+            }
+
+            score_thus_far
+        }
+    }
+}
+
+#[allow(dead_code)]
+pub(crate) fn negamax_best_move(position: &UnwrappedFen, depth: i8) -> (<UnwrappedFen as HasBoard>::MoveRep, i16) {
+    let valid_moves = position.get_legal_proper_moves();
+    
+    let mut best_move = ChessMove::NullMove;
+    let mut best_eval = i16::MIN;
+
+    for hopeful_move in valid_moves {
+        let successor_position = position.after_move(hopeful_move);
+
+        match best_move {
+            ChessMove::NullMove => {
+                best_move = hopeful_move;
+                best_eval = negamax_evaluate(&successor_position, depth - 1)
+            },
+            _ => {
+                match negamax_evaluate(&successor_position, depth - 1) > best_eval {
+                    true => {
+                        best_move = hopeful_move;
+                        best_eval = negamax_evaluate(&successor_position, depth - 1)
+                    },
+                    false => {},
+                }
+            }
+        }
+    }
+
+    (best_move, best_eval)
+}
 
 // TODO: implement Evaluator etc for that evaluation. 
 
 // TODO: figure out a basic data structure to hold a search tree where leaf nodes are readily 
 // accessible, and implement Searches for it using the evaluator above and AB search. Maybe 
 // do negamax first. 
+// CORRECTION: ^^ This is bad apparently. Use recursive search and store tables. 
