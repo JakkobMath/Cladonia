@@ -496,7 +496,7 @@ fn main() {
     if trying_negamax {
         println!("Starting search of startpos");
         let mut move_options = STARTPOS.get_legal_proper_moves();
-        move_options.sort_by(|move_to_make, other_move| mvv_lva_score(&STARTPOS, *move_to_make).cmp(&mvv_lva_score(&STARTPOS, *other_move)));
+        mvv_lva_sort(&STARTPOS, &mut move_options);
         for valid_move in move_options {
             println!("After {}", valid_move);
             let negamax_results = negamax_best_move(&STARTPOS.after_move(valid_move), 5);
