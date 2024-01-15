@@ -21,6 +21,8 @@
 // but including further optimizations when types also implement, say, the minimal window-querying 
 // functionality for alpha-beta to function. 
 
+use crate::chess::implementations::impls_vzero::{io_code::*, movegen::*, eval_code::*, board_rep::*};
+
 pub(crate) mod chess;
 
 pub(crate) mod game_data {
@@ -37,7 +39,7 @@ pub(crate) mod game_data {
 pub(crate) mod search;
 
 fn main() {
-    use chess::{abstracts::{helper_traits::*, helper_types::*}, implementations::impls_vzero::*};
+    use chess::abstracts::{helper_traits::*, helper_types::*};
 
     let trying_startpos_perft = false;
     let first_test = false;
