@@ -1115,7 +1115,11 @@ fn pesto_evalutation_stm(position: &UnwrappedFen) -> i32 {
 }
 
 pub(crate) fn mvv_lva_sort(position: &UnwrappedFen, moves_list: &mut Vec<<UnwrappedFen as HasBoard>::MoveRep>) {
-    moves_list.sort_by(|move_to_make, other_move| mvv_lva_score(position, *move_to_make).cmp(&mvv_lva_score(position, *other_move)))
+    moves_list.sort_by(|move_to_make, other_move| mvv_lva_score(position, *move_to_make).cmp(&mvv_lva_score(position, *other_move)));
+    moves_list.retain_mut(|possible_move| position.check_remaining_legality(*possible_move));
+
+    // Introducing this temporary fix for performance reasons.
+    moves_list.truncate(12)
 }
 
 // Higher score -> put move earlier. 
@@ -1156,22 +1160,20 @@ fn negamax_evaluate(position: &UnwrappedFen, depth: i8) -> i32 {
         true => pesto_evalutation_stm(position),
         false => {
             let mut valid_moves = position.get_pseudo_legal_proper_moves();
-            valid_moves.sort_by(|move_to_make, other_move| mvv_lva_score(position, *move_to_make).cmp(&mvv_lva_score(position, *other_move)));
+            mvv_lva_sort(position, &mut valid_moves);
 
             let mut score_thus_far = i32::MIN + 1;
 
             for hopeful_move in valid_moves {
-                if position.check_remaining_legality(hopeful_move) {
-                    let successor_position = position.after_move(hopeful_move);
-                    let successor_estimated_value = -negamax_evaluate(&successor_position, depth-1);
+                let successor_position = position.after_move(hopeful_move);
+                let successor_estimated_value = -negamax_evaluate(&successor_position, depth-1);
 
-                    // I probably shouldn't be trying to be fancy, but I kind of want to punish 
-                    // the evaluation if there are move options of similar but slightly lower 
-                    // evaluation. Doing too much work to avoid overflows anywhere. Good thing 
-                    // this gets replaced later. Partly I'm also hoping this functions to fill 
-                    // some of the large gaps we have in the space of possible outputs. 
-                    score_thus_far = score_thus_far.max(successor_estimated_value);
-                }
+                // I probably shouldn't be trying to be fancy, but I kind of want to punish 
+                // the evaluation if there are move options of similar but slightly lower 
+                // evaluation. Doing too much work to avoid overflows anywhere. Good thing 
+                // this gets replaced later. Partly I'm also hoping this functions to fill 
+                // some of the large gaps we have in the space of possible outputs. 
+                score_thus_far = score_thus_far.max(successor_estimated_value);
             }
 
             score_thus_far
