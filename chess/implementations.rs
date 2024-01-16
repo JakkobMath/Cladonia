@@ -4,6 +4,6 @@
 // chess-related functions, and later impls_version submodules are expected 
 // to become progressively better at this. 
 
-use super::abstracts::{helper_traits::*, helper_types::*};
+use super::abstracts::helper_types::*;
 
 pub(crate) mod impls_vzero;
