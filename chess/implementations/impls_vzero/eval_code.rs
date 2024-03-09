@@ -46,162 +46,163 @@ fn naive_evaluation_stm(position: &UnwrappedFen) -> i16 {
 // from these tables. 
 
 // Indexing differently <=> swapping black and white, makes this easier to copy. 
-const PESTO_MG_PAWN_B: [i16; 64] = [
-    0,   0,   0,   0,   0,   0,  0,   0, 
-    98, 134,  61,  95,  68, 126, 34, -11, 
-    -6,   7,  26,  31,  65,  56, 25, -20, 
-    -14,  13,   6,  21,  23,  12, 17, -23, 
-    -27,  -2,  -5,  12,  17,   6, 10, -25, 
-    -26,  -4,  -4, -10,   3,   3, 33, -12, 
-    -35,  -1, -20, -23, -15,  24, 38, -22, 
-    0,   0,   0,   0,   0,   0,  0,   0, 
+const MG_PAWN_B: [i16; 64] = [
+      0,   0,   0,   0,   0,   0,   0,   0,
+     90,  93,  90,  87,  87,  90,  93,  90,
+     28,  70,  18,   5,   5,  18,  70,  28,
+    -29, -31, -33, -40, -40, -33, -31, -29,
+    -37, -30, -47,   2,   2, -47, -30, -37,
+    -30, -47, -24, -20, -20, -24, -47, -30,
+    -22, -20, -20, -53, -53, -20, -20, -22,
+      0,   0,   0,   0,   0,   0,   0,   0,
 ];
 
-const PESTO_EG_PAWN_B: [i16; 64] = [
-    0,   0,   0,   0,   0,   0,   0,   0, 
-    178, 173, 158, 134, 147, 132, 165, 187, 
-    94, 100,  85,  67,  56,  53,  82,  84, 
-    32,  24,  13,   5,  -2,   4,  17,  17, 
-    13,   9,  -3,  -7,  -7,  -8,   3,  -1, 
-    4,   7,  -6,   1,   0,  -5,  -1,  -8, 
-    13,   8,   8,  10,  13,   0,   2,  -7, 
-    0,   0,   0,   0,   0,   0,   0,   0, 
+const EG_PAWN_B: [i16; 64] = [
+      0,   0,   0,   0,   0,   0,   0,   0,
+     95, 103,  98,  88,  88,  98, 103,  95,
+     38,  78,  28,   8,   8,  28,  78,  38,
+    -19, -25, -23, -30, -30, -23, -25, -19,
+    -27, -47, -42, -37, -37, -42, -47, -27,
+    -32, -37, -39, -40, -40, -39, -37, -32,
+    -32, -32, -32, -42, -42, -32, -32, -32,
+      0,   0,   0,   0,   0,   0,   0,   0,   
 ];
 
-const PESTO_MG_KNIGHT_B: [i16; 64] = [
-    -167, -89, -34, -49,  61, -97, -15, -107, 
-    -73, -41,  72,  36,  23,  62,   7,  -17, 
-    -47,  60,  37,  65,  84, 129,  73,   44, 
-    -9,  17,  19,  53,  37,  69,  18,   22, 
-    -13,   4,  16,  13,  28,  19,  21,   -8, 
-    -23,  -9,  12,  10,  19,  17,  25,  -16, 
-    -29, -53, -12,  -3,  -1,  18, -14,  -19, 
-    -105, -21, -58, -33, -17, -28, -19,  -23, 
+const MG_KNIGHT_B: [i16; 64] = [
+    -40, -32, -23, -23, -23, -23, -32, -40,
+    -32,  -6,   4,   9,   9,   4,  -6, -32,
+    -10,   8,  17,  23,  23,  17,   8, -10,
+     -4,  13,  32,  34,  34,  32,  13,  -4,
+     -4,  14,  29,  32,  32,  29,  14,  -4,
+     -7,   9,  24,  30,  30,  24,   9,  -7,
+    -32,  -6,   8,  12,  12,   8,  -6, -32,
+    -40, -13, -13, -13, -13, -13, -13, -40,
 ];
 
-const PESTO_EG_KNIGHT_B: [i16; 64] = [
-    -58, -38, -13, -28, -31, -27, -63, -99, 
-    -25,  -8, -25,  -2,  -9, -25, -24, -52, 
-    -24, -20,  10,   9,  -1,  -9, -19, -41, 
-    -17,   3,  22,  22,  22,  11,   8, -18, 
-    -18,  -6,  16,  25,  16,  17,   4, -18, 
-    -23,  -3,  -1,  15,  10,  -3, -20, -22, 
-    -42, -20, -10,  -5,  -2, -20, -23, -44, 
-    -29, -51, -23, -15, -22, -18, -50, -64, 
+const EG_KNIGHT_B: [i16; 64] = [
+    -42, -34, -9, -6, -6, -9, -34, -42,
+    -34,  -8,  6, 11, 11,  6,  -8, -34,
+     -9,   6, 24, 28, 28, 24,   6,  -9,
+     -6,  11, 28, 36, 36, 28,  11,  -6,
+     -6,  11, 28, 36, 36, 28,  11,  -6,
+     -9,   6, 21, 28, 28, 21,   6,  -9,
+    -34,  -8,  6, 10, 10,  6,  -8, -34,
+    -42, -34, -9, -6, -6, -9, -34, -42,   
 ];
 
-const PESTO_MG_BISHOP_B: [i16; 64] = [
-    -29,   4, -82, -37, -25, -42,   7,  -8, 
-    -26,  16, -18, -13,  30,  59,  18, -47, 
-    -16,  37,  43,  40,  35,  50,  37,  -2, 
-    -4,   5,  19,  50,  37,  37,   7,  -2, 
-    -6,  13,  13,  26,  34,  12,  10,   4, 
-    0,  15,  15,  15,  14,  27,  18,  10, 
-    4,  15,  16,   0,   7,  21,  33,   1, 
-    -33,  -3, -14, -21, -13, -12, -39, -21, 
+const MG_BISHOP_B: [i16; 64] = [
+    -30, -20, -12, -10, -10, -12, -20, -30,
+    -20,   2,  10,  10,  10,  10,   2, -20,
+    -12,  10,  10,  10,  10,  10,  10, -12,
+    -10,  12,  19,  21,  21,  19,  12, -10,
+    -10,  12,  20,  22,  22,  20,  12, -10,
+    -12,  12,  18,  20,  20,  18,  12, -12,
+    -15,  23,  15,  12,  12,  15,  23, -15,
+    -30, -20, -10, -15, -15, -10, -20, -30,
 ];
 
-const PESTO_EG_BISHOP_B: [i16; 64] = [
-    -14, -21, -11,  -8, -7,  -9, -17, -24, 
-    -8,  -4,   7, -12, -3, -13,  -4, -14, 
-    2,  -8,   0,  -1, -2,   6,   0,   4, 
-    -3,   9,  12,   9, 14,  10,   3,   2, 
-    -6,   3,  13,  19,  7,  10,  -3,  -9, 
-    -12,  -3,   8,  10, 13,   3,  -7, -15, 
-    -14, -18,  -7,  -1,  4,  -9, -15, -27, 
-    -23,  -9, -23,  -5, -9, -16,  -5, -17, 
+const EG_BISHOP_B: [i16; 64] = [
+    -2,  0, -1, -1, -1, -1,  0, -2,
+     0, -1,  0, -1, -1,  0, -1,  0,
+    -1,  0,  0,  1,  1,  0,  0, -1,
+    -1, -1,  1,  6,  6,  1, -1, -1,
+    -1, -1,  2,  6,  6,  2, -1, -1,
+    -1,  0,  0,  2,  2,  0,  0, -1,
+     0, -1,  0, -1, -1,  0, -1,  0,
+    -2,  0, -1, -1, -1, -1,  0, -2,   
 ];
 
-const PESTO_MG_ROOK_B: [i16; 64] = [
-    32,  42,  32,  51, 63,  9,  31,  43, 
-    27,  32,  58,  62, 80, 67,  26,  44, 
-    -5,  19,  26,  36, 17, 45,  61,  16, 
--24, -11,   7,  26, 24, 35,  -8, -20, 
--36, -26, -12,  -1,  9, -7,   6, -23, 
--45, -25, -16, -17,  3,  0,  -5, -33, 
--44, -16, -20,  -9, -1, 11,  -6, -71, 
--19, -13,   1,  17, 16,  7, -37, -26, 
+const MG_ROOK_B: [i16; 64] = [
+    -1, -1, -1, -1, -1, -1, -1, -1,
+    11, 11, 11, 11, 11, 11, 11, 11,
+    -2, -4, -4, -4, -4, -4, -4, -2,
+    -4, -4, -4, -4, -4, -4, -4, -4,
+    -4, -4, -4, -4, -4, -4, -4, -4,
+    -3, -4, -4, -4, -4, -4, -4, -3,
+    -1, -2, -3, -3, -3, -3, -2, -1,
+     3, -1, 11, 17, 17, 11, -1,  3,   
 ];
 
-const PESTO_EG_ROOK_B: [i16; 64] = [
-    13, 10, 18, 15, 12,  12,   8,   5, 
-    11, 13, 13, 11, -3,   3,   8,   3, 
-    7,  7,  7,  5,  4,  -3,  -5,  -3, 
-    4,  3, 13,  1,  2,   1,  -1,   2, 
-    3,  5,  8,  4, -5,  -6,  -8, -11, 
-    -4,  0, -5, -1, -7, -12,  -8, -16, 
-    -6, -6,  0,  2, -9,  -9, -11,  -3, 
-    -9,  2,  3, -1, -5, -13,   4, -20, 
+const EG_ROOK_B: [i16; 64] = [
+     4,  7, 17, -3, -3, 17,  7,  4,
+     9, -3, -3, -3, -3, -3, -3,  9,
+    14, -3, -3, -3, -3, -3, -3, 14,
+    -3, -3, -2, -3, -3, -2, -3, -3,
+    -1, -3, -3, -3, -3, -3, -3, -1,
+     5, -2, -3, -3, -3, -3, -2,  5,
+     1, -1, -2, -2, -2, -2, -1,  1,
+    -2, -1,  2, -1, -1,  2, -1, -2,
 ];
 
-const PESTO_MG_QUEEN_B: [i16; 64] = [
-    -28,   0,  29,  12,  59,  44,  43,  45, 
-    -24, -39,  -5,   1, -16,  57,  28,  54, 
-    -13, -17,   7,   8,  29,  56,  47,  57, 
-    -27, -27, -16, -16,  -1,  17,  -2,   1, 
-    -9, -26,  -9, -10,  -2,  -4,   3,  -3, 
-    -14,   2, -11,  -2,  -5,   2,  14,   5, 
-    -35,  -8,  11,   2,   8,  15,  -3,   1, 
-    -1, -18,  -9,  10, -15, -25, -31, -50, 
+const MG_QUEEN_B: [i16; 64] = [
+    -20, -11, -8, -8, -8, -8, -11, -20,
+    -10,   2,  3,  2,  2,  3,   2, -10,
+     -5,   4, -2, -2, -2, -2,   4,  -5,
+     -4,   5, -1,  2,  2, -1,   5,  -4,
+     -2,   6,  1,  4,  4,  1,   6,  -2,
+     -1,   7,  3,  3,  3,  3,   7,  -1,
+     -1,  10, 13, 12, 12, 13,  10,  -1,
+    -10,  -1,  4,  5,  5,  4,  -1, -10,
 ];
 
-const PESTO_EG_QUEEN_B: [i16; 64] = [
-    -9,  22,  22,  27,  27,  19,  10,  20, 
--17,  20,  32,  41,  58,  25,  30,   0, 
--20,   6,   9,  49,  47,  35,  19,   9, 
-    3,  22,  24,  45,  57,  40,  57,  36, 
--18,  28,  19,  47,  31,  34,  39,  23, 
--16, -27,  15,   6,   9,  17,  10,   5, 
--22, -23, -30, -16, -16, -23, -36, -32, 
--33, -28, -22, -43,  -5, -32, -20, -41, 
+const EG_QUEEN_B: [i16; 64] = [
+    -5, -2, -1, -1, -1, -1, -2, -5,
+    -2,  2,  3,  2,  2,  3,  2, -2,
+    -1,  3,  0,  0,  0,  0,  3, -1,
+    -1,  2,  0,  1,  1,  0,  2, -1,
+    -1,  2,  0,  1,  1,  0,  2, -1,
+    -1,  3,  0,  0,  0,  0,  3, -1,
+    -2,  2,  3,  2,  2,  3,  2, -2,
+    -5, -2, -1, -1, -1, -1, -2, -5,
 ];
 
-const PESTO_MG_KING_B: [i16; 64] = [
-    -65,  23,  16, -15, -56, -34,   2,  13, 
-    29,  -1, -20,  -7,  -8,  -4, -38, -29, 
-    -9,  24,   2, -16, -20,   6,  22, -22, 
-    -17, -20, -12, -27, -30, -25, -14, -36, 
-    -49,  -1, -27, -39, -46, -44, -33, -51, 
-    -14, -14, -22, -46, -44, -30, -15, -27, 
-    1,   7,  -8, -64, -43, -16,   9,   8, 
-    -15,  36,  12, -54,   8, -28,  24,  14, 
+const MG_KING_B: [i16; 64] = [
+    -34, -24, -12,  -9,  -9, -12, -24, -34,
+    -24, -13, -13, -13, -13, -13, -13, -24,
+    -13, -13, -13, -13, -13, -13, -13, -13,
+    -13, -13, -13, -13, -13, -13, -13, -13,
+    -13, -13, -13, -13, -13, -13, -13, -13,
+     -4,  -5, -13, -13, -13, -13,  -5,  -4,
+     21,  16,  -6,  -6,  -6,  -6,  16,  21,
+     46,  79,  37,  18,  18,  37,  79,  46,
 ];
 
-const PESTO_EG_KING_B: [i16; 64] = [
-    -74, -35, -18, -18, -11,  15,   4, -17, 
-    -12,  17,  14,  17,  17,  38,  23,  11, 
-    10,  17,  23,  15,  20,  45,  44,  13, 
-    -8,  22,  24,  27,  26,  33,  26,   3, 
-    -18,  -4,  21,  24,  27,  23,   9, -11, 
-    -19,  -3,  11,  21,  23,  16,   7,  -9, 
-    -27, -11,   4,  13,  14,   4,  -5, -17, 
-    -53, -34, -21, -11, -28, -14, -24, -43, 
+const EG_KING_B: [i16; 64] = [
+    -63, -30, -18, -15, -15, -18, -30,  -63,  
+    -30,   6,  22,  20,  20,  22,   6,  -30,  
+    -18,  22,  29,  30,  30,  29,  22,  -18,  
+    -15,  20,  30,  31,  31,  30,  20,  -15,  
+    -15,  19,  28,  31,  31,  28,  19,  -15,  
+    -18,  13,  24,  27,  27,  24,  13,  -18,  
+    -30,   0,  11,  15,  15,  11,   0,  -30,  
+    -63, -30, -18, -15, -15, -18, -30,  -63,  
+
 ];
 
 const PESTO_MG_COMBINED_B: [[i16; 64]; 6] = [
-    PESTO_MG_PAWN_B, 
-    PESTO_MG_KNIGHT_B, 
-    PESTO_MG_BISHOP_B, 
-    PESTO_MG_ROOK_B, 
-    PESTO_MG_QUEEN_B, 
-    PESTO_MG_KING_B, 
+    MG_PAWN_B, 
+    MG_KNIGHT_B, 
+    MG_BISHOP_B, 
+    MG_ROOK_B, 
+    MG_QUEEN_B, 
+    MG_KING_B, 
 ];
 
 const PESTO_EG_COMBINED_B: [[i16; 64]; 6] = [
-    PESTO_EG_PAWN_B, 
-    PESTO_EG_KNIGHT_B, 
-    PESTO_EG_BISHOP_B, 
-    PESTO_EG_ROOK_B, 
-    PESTO_EG_QUEEN_B, 
-    PESTO_EG_KING_B, 
+    EG_PAWN_B, 
+    EG_KNIGHT_B, 
+    EG_BISHOP_B, 
+    EG_ROOK_B, 
+    EG_QUEEN_B, 
+    EG_KING_B, 
 ];
 
-const PESTO_GAME_PHASE_ADDER: [i32; 6] = [0, 1, 1, 2, 4, 0];
+const GAME_PHASE_ADDER: [i32; 6] = [1, 3, 3, 5, 9, 0];
 
-const PESTO_DEFAULT_MG_VALUES: [i32; 6] = [82, 337, 365, 477, 1025, 0];
-const PESTO_DEFAULT_EG_VALUES: [i32; 6] = [94, 281, 297, 512,  936, 0];
+const DEFAULT_MG_VALUES: [i32; 6] = [100, 303, 305, 500, 900, 0];
+const DEFAULT_EG_VALUES: [i32; 6] = [105, 295, 310, 520, 940, 0];
 
-fn pesto_evalutation_stm(position: &UnwrappedFen) -> i32 {
+fn hce_stm(position: &UnwrappedFen) -> i32 {
     let mut mg_value = 0;
     let mut eg_value = 0;
     let mut game_phase = 0;
@@ -221,28 +222,28 @@ fn pesto_evalutation_stm(position: &UnwrappedFen) -> i32 {
                 let mg_piece_square_value = match piece.get_color() {
                     EnumColor::White => PESTO_MG_COMBINED_B[piece_number][vertical_flip_index(square_index) as usize],
                     EnumColor::Black => PESTO_MG_COMBINED_B[piece_number][square_index as usize],
-                } as i32 + PESTO_DEFAULT_MG_VALUES[piece_number];
+                } as i32 + DEFAULT_MG_VALUES[piece_number];
                 let eg_piece_square_value = match piece.get_color() {
                     EnumColor::White => PESTO_EG_COMBINED_B[piece_number][vertical_flip_index(square_index) as usize],
                     EnumColor::Black => PESTO_EG_COMBINED_B[piece_number][square_index as usize],
-                } as i32 + PESTO_DEFAULT_EG_VALUES[piece_number];
+                } as i32 + DEFAULT_EG_VALUES[piece_number];
                 let stm_multiplier = match position.get_color() == piece.get_color() {
                     true => 1,
                     false => -1,
                 };
                 mg_value += mg_piece_square_value * stm_multiplier;
                 eg_value += eg_piece_square_value * stm_multiplier;
-                game_phase += PESTO_GAME_PHASE_ADDER[piece_number];
+                game_phase += GAME_PHASE_ADDER[piece_number];
             },
         }
     }
     
     // Endpoint evals set up, now taper them to get the output eval. 
 
-    let mg_multiplier = game_phase.min(24);
-    let eg_multiplier = 24i32 - mg_multiplier;
+    let mg_multiplier = game_phase.min(28);
+    let eg_multiplier = 28i32 - mg_multiplier;
 
-    (mg_value * mg_multiplier + eg_value * eg_multiplier) / 24
+    (mg_value * mg_multiplier + eg_value * eg_multiplier) / 28
 }
 
 // TODO: implement Evaluator etc for that evaluation. 
@@ -251,7 +252,7 @@ pub(crate) fn mvv_lva_sort(position: &UnwrappedFen, moves_list: &mut Vec<<Unwrap
     moves_list.sort_by(|move_to_make, other_move| mvv_lva_score(position, *move_to_make).cmp(&mvv_lva_score(position, *other_move)));
     moves_list.retain_mut(|possible_move| position.check_remaining_legality(*possible_move));
 
-    // Introducing this temporary fix for performance reasons.
+    // Introducing this temporary fix for performance reasons. Obviously this gets deleted later :) (TODO)
     moves_list.truncate(12)
 }
 
@@ -290,7 +291,7 @@ pub(crate) fn mvv_lva_score(position: &UnwrappedFen, move_to_make: <UnwrappedFen
 
 fn negamax_evaluate(position: &UnwrappedFen, depth: i8) -> i32 {
     match depth <= 0 {
-        true => pesto_evalutation_stm(position),
+        true => hce_stm(position),
         false => {
             let mut valid_moves = position.get_pseudo_legal_proper_moves();
             mvv_lva_sort(position, &mut valid_moves);
