@@ -202,7 +202,7 @@ const GAME_PHASE_ADDER: [i32; 6] = [1, 3, 3, 5, 9, 0];
 const DEFAULT_MG_VALUES: [i32; 6] = [100, 303, 305, 500, 900, 0];
 const DEFAULT_EG_VALUES: [i32; 6] = [105, 295, 310, 520, 940, 0];
 
-fn hce_stm(position: &UnwrappedFen) -> i32 {
+pub(crate) fn hce_stm(position: &UnwrappedFen) -> i32 {
     let mut mg_value = 0;
     let mut eg_value = 0;
     let mut game_phase = 0;
@@ -343,4 +343,142 @@ pub(crate) fn negamax_best_move(position: &UnwrappedFen, depth: i8) -> (<Unwrapp
     }
 
     (best_move, best_eval)
+}
+
+fn get_sorted_plp_moves(position: &UnwrappedFen) -> Vec<ChessMove<i8,i8>> {
+    let mut valid_moves = position.get_pseudo_legal_proper_moves();
+    mvv_lva_sort(position, &mut valid_moves);
+    return valid_moves;
+}
+
+#[allow(dead_code)]
+pub(crate) fn ab_best_move(position: &UnwrappedFen, depth: i8, alpha: i32, beta: i32, wiggle_room: i32, force: bool) -> Option<(<UnwrappedFen as HasBoard>::MoveRep, i32)> {
+
+    // Use an alpha-beta search and the hand-"crafted" evaluation to determine the value of a position. 
+    // Includes the option to force a search to return a value; searches are allowed to fail by default. 
+    // Searches that are forced to return a value still attempt to rely on pruning in their successors. 
+    // Not yet end-of-game aware. May produce strange results in positions where mate is unavoidable. 
+
+    // Alpha is the ambient minimum value we (from our perspective) are willing to accept. 
+    // Beta is the ambient minimum value the opponent (from their perspective) is willing to accept. 
+
+    if depth <= 0 {
+        return Some((ChessMove::NullMove, hce_stm(position)));
+    } else {
+        let valid_moves = get_sorted_plp_moves(position);
+
+        let mut best_move = ChessMove::NullMove;
+        let mut own_alpha = alpha;
+        let mut own_beta = beta;
+        let mut curr_best = i32::MIN + 1;
+
+        let mut own_wiggle_room = wiggle_room.max(7).min(150);
+
+        let mut blocked = true;
+        let mut force_successors = false;
+
+        // TODO: remove. This is for debugging. 
+        let mut blocked_iterations = 0i8;
+
+        // Run until either (1, if forced to return a value) there is a value to return, or 
+        // (2, if not forced) every child has been examined. 
+        while blocked {
+
+            // We want to tighten up the wiggle room as we go along so we don't have too high of a branching factor. 
+            // If it gets too small and the search can't succeed enough it'll be doubled. Code inside the AB search 
+            // function prevents successors from having an effective wiggle below (currently) 7... which should be 
+            // extracted to a global constant or something, probably. 
+            let successor_wiggle_room = (3 * (own_wiggle_room / 4)).max(7 * (wiggle_room / 4)) - wiggle_room;
+
+            for hopeful_move in &valid_moves {
+                let successor_position = position.after_move(*hopeful_move);
+
+                // Will be replaced by TT later. With iterative deepening, this will let us make use of more accurate 
+                // results for initial filtering. Also, before this function can be trusted, it NEEDS qsearch to make 
+                // sure all lines with trades aren't pruned because of the captures. 
+                let static_move_evaluation = -hce_stm(&successor_position); 
+    
+                match (static_move_evaluation >= own_alpha.max(i32::MIN + own_wiggle_room + 1) - own_wiggle_room && static_move_evaluation <= own_wiggle_room - own_beta.max(i32::MIN + own_wiggle_room + 1)) || force {
+
+                    // If the move looks bad at first glance and we haven't gotten desparate for a follow-up, ignore it. 
+                    // This probably turns into a depth reduction later instead of full pruning. 
+                    false => {},
+
+                    // If the move looks okay, continue with recursive AB search 
+                    // to determine its value (hopefully) more accurately. 
+                    true => {
+                        match ab_best_move(&successor_position, depth-1, own_beta, own_alpha, successor_wiggle_room, force_successors) {
+                            None => {
+                                // If the search failed from the child node, ignore the continuation unless this 
+                                // node needs to return a continuation and has previously failed to do so. 
+                            },
+                            Some((_follow_up, opponent_value)) => {
+                                let searched_move_value = -opponent_value;
+
+                                let refined_wiggle = own_wiggle_room / (depth as i32);
+
+                                // We'll only consider this move further if it's good or if we have to. 
+                                match searched_move_value >= own_alpha.max(i32::MIN + refined_wiggle + 1) - refined_wiggle || (force && blocked) { 
+                                    true => {
+                                        if searched_move_value > curr_best {
+                                            curr_best = searched_move_value;
+                                            best_move = *hopeful_move;
+
+                                            // We are free to exit the loop: we have got a move and evaluation to return. 
+                                            blocked = false;
+                                        }
+
+                                        // Update the worse we can expect and the best the opponent 
+                                        // can expect should the game pass through this node. 
+                                        own_alpha = own_alpha.max(searched_move_value.max(i32::MIN + refined_wiggle + 1) - refined_wiggle);
+                                        own_beta = own_beta.min(opponent_value.min(i32::MAX - refined_wiggle - 1) + refined_wiggle);
+
+                                        // If the opponent would reject this continuation from the previous node 
+                                        // based on this move being too good of a response, we don't need to 
+                                        // continue searching more options. 
+                                        if own_beta < beta && !(force && blocked) {
+                                            break;
+                                        }
+                                    }
+                                    false => {}
+                                }
+                            }
+                        }
+                    },
+                }
+            }
+
+            // Every move has been checked. If no continuations have been 
+            // found but an answer is forced, we may need to re-search. 
+            blocked = blocked && force;
+
+            // On a re-search, be more generous with the bounds. 
+            own_wiggle_room *= 2;
+
+            // If we're already allowing for a very large error (>1.5 pawns), 
+            // force successor positions to return answers on the next loop. 
+            // If the parent position isn't forced, a next loop won't happen. 
+            force_successors = own_wiggle_room > 150;
+
+            
+            // TODO: this is for debugging. Remove. 
+            blocked_iterations += 1;
+            if blocked_iterations > 12 {
+                // Trigger debug thing!
+
+                blocked_iterations += 12; // Fix breakpoint please?
+                if blocked_iterations == 32 {
+                    println!("Stop sending me unread variable errors please.")
+                }
+                break;
+            }
+        }
+
+
+
+        return match !best_move.is_proper() && !force {
+            true => None,
+            false => Some((best_move, curr_best)),
+        }
+    }
 }

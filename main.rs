@@ -67,7 +67,10 @@ fn main() {
     let pos_6_string = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10".to_string();
     let trying_pos_6_perft = false;
 
-    let trying_negamax = true;
+    let trying_negamax = false;
+    let trying_ab_search = false;
+    let testing_several_depths_ab = true;
+    let testing_for_hce_sign_error = false;
 
     if trying_startpos_perft {
         println!("Perft from STARTPOS:");
@@ -503,6 +506,56 @@ fn main() {
             println!("After {}", valid_move);
             let negamax_results = negamax_best_move(&STARTPOS.after_move(valid_move), 5);
             println!("Best move found and its evaluation: {0} gives evaluation {1}", negamax_results.0, negamax_results.1)
+        }
+    }
+    if trying_ab_search {
+        println!("Starting AB search of startpos");
+        let mut move_options = STARTPOS.get_legal_proper_moves();
+        mvv_lva_sort(&STARTPOS, &mut move_options);
+        for valid_move in move_options {
+            println!("After {}", valid_move);
+            let ab_results = ab_best_move(&STARTPOS.after_move(valid_move), 5, i32::MIN + 1, i32::MIN + 1, 15, true);
+            match ab_results {
+                None => println!("Search failed somehow"),
+                Some((bestmove, score)) => {
+                    println!("Best move found and its evaluation: {0} gives evaluation {1} for white.", bestmove, -score)
+                }
+            }
+        }
+    }
+    if testing_several_depths_ab {
+        println!("Starting AB searches of startpos.");
+        let mut move_options = STARTPOS.get_legal_proper_moves();
+        mvv_lva_sort(&STARTPOS, &mut move_options);
+        for depth in 0..9 {
+            println!("Starting search at depth {0}", depth);
+            let search_results = ab_best_move(&STARTPOS, depth, i32::MIN + 1, i32::MIN + 1, 15, true);
+            match search_results {
+                None => println!("Search failed somehow"),
+                Some((bestmove,score)) => {
+                    println!("Best move found and its evaluation: {0} gives evaluation {1} for white.",bestmove,score);
+                    if depth >0 {
+                        let follow_up_position = &STARTPOS.after_move(bestmove);
+                        let responding_search_results = ab_best_move(follow_up_position, depth-1, i32::MIN + 1, i32::MIN + 1, 15, true);
+                        match responding_search_results {
+                            None => println!("Search failed somehow"),
+                            Some((bestresponse,opp_score)) => {
+                                println!("The recommended follow-up is {0} to keep white advangate at {1}",bestresponse,-opp_score);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if testing_for_hce_sign_error {
+        // Turns out I *was* flipping the sign on static evals (whoops... unfortunately fixing 
+        // this made horizon effect show up where it hadn't before, so lost elo? LUL), but the 
+        // effect I was noticing came from negating a score in main because I'd copied something 
+        // from a test that used results from the black perspective. 
+        let move_options = STARTPOS.get_legal_proper_moves();
+        for option in move_options {
+            println!("HCE eval after {0} from black perspective: {1}; for white: {2}", option, hce_stm(&STARTPOS.after_move(option)), -hce_stm(&STARTPOS.after_move(option)));
         }
     }
 
