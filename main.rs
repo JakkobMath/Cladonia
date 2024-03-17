@@ -41,6 +41,8 @@ pub(crate) mod search;
 fn main() {
     use chess::abstracts::{helper_traits::*, helper_types::*};
 
+    let start = std::time::Instant::now();
+
     let trying_startpos_perft = false;
     let first_test = false;
     let second_test = false;
@@ -69,8 +71,9 @@ fn main() {
 
     let trying_negamax = false;
     let trying_ab_search = false;
-    let testing_several_depths_ab = true;
+    let testing_several_depths_ab = false;
     let testing_for_hce_sign_error = false;
+    let deeper_ab_test = false;
 
     if trying_startpos_perft {
         println!("Perft from STARTPOS:");
@@ -267,7 +270,7 @@ fn main() {
         match try_kiwipete_pos {
             Err(some_error) => println!("Error with parsing Kiwipete: {}", some_error),
             Ok(kiwipete) => {
-                let (total_num, sub_perfts) = depth_n_better_perft(kiwipete, 4);
+                let (total_num, sub_perfts) = depth_n_better_perft(kiwipete, 5);
                 println!("Total: {}", total_num);
                 for (move_made, successors_num) in sub_perfts {
                     println!("{0} - {1}", move_made, successors_num)
@@ -558,6 +561,16 @@ fn main() {
             println!("HCE eval after {0} from black perspective: {1}; for white: {2}", option, hce_stm(&STARTPOS.after_move(option)), -hce_stm(&STARTPOS.after_move(option)));
         }
     }
+    if deeper_ab_test {
+        let search_depth_ten = ab_best_move(&STARTPOS, 10, i32::MIN + 1, i32::MIN + 1, 15, true);
+        match search_depth_ten {
+            None => println!("Search failed! :("),
+            Some((bestmove,score)) => println!("AB eval at depth 10: {0} gives eval {1}.",bestmove,score),
+        }
+    }
 
     // Perft for all tested positions gives correct totals up to depth 4, and startpos is correct to depth 5. 
+
+    let time = start.elapsed();
+    println!("Time taken: {0}",time.as_secs_f64());
 }
