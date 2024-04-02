@@ -39,7 +39,16 @@ pub(crate) mod game_data {
 pub(crate) mod search;
 
 fn main() {
-    use chess::abstracts::{helper_traits::*, helper_types::*};
+    use {std::io, chess::abstracts::{helper_traits::*, helper_types::*}};
+
+    let mut initial_command = String::new();
+    let stdin = io::stdin();
+    let _ = stdin.read_line(&mut initial_command); // Ignore errors for now. 
+    if initial_command == "uci" {
+        println!("id name Cladonia");
+        println!("id author JakkobMath");
+        println!("uci_not_yet_ok"); // Don't want to lie :) Needs to change to uciok later. 
+    }
 
     let start = std::time::Instant::now();
 
