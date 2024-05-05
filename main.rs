@@ -48,6 +48,17 @@ fn main() {
         println!("id name Cladonia");
         println!("id author JakkobMath");
         println!("uci_not_yet_ok"); // Don't want to lie :) Needs to change to uciok later. 
+        let mut new_command = String::new();
+        let _ = stdin.read_line(&mut new_command); // Ignore errors for now. 
+        let mut initial_position = STARTPOS;
+        let mut divided_up_command = new_command.split_whitespace();
+        let first_part = divided_up_command.next();
+        match first_part {
+            None => panic!(),
+            Some(string) => {
+                // Todo. Also, todo: fix all of this junk. It's awful. 
+            }
+        }
     }
 
     let start = std::time::Instant::now();
