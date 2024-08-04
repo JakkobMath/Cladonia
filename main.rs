@@ -24,6 +24,7 @@
 use crate::chess::implementations::impls_vzero::{io_code::*, movegen::*, eval_code::*, board_rep::*};
 
 pub(crate) mod chess;
+pub mod value;
 
 pub(crate) mod game_data {
     // The search needs a generic way to interface with games. We need an analog of FENnec providing 
@@ -39,27 +40,27 @@ pub(crate) mod game_data {
 pub(crate) mod search;
 
 fn main() {
-    use {std::io, chess::abstracts::{helper_traits::*, helper_types::*}};
+    use {/*std::io, */chess::abstracts::{helper_traits::*, helper_types::*}};
 
-    let mut initial_command = String::new();
-    let stdin = io::stdin();
-    let _ = stdin.read_line(&mut initial_command); // Ignore errors for now. 
-    if initial_command == "uci" {
-        println!("id name Cladonia");
-        println!("id author JakkobMath");
-        println!("uci_not_yet_ok"); // Don't want to lie :) Needs to change to uciok later. 
-        let mut new_command = String::new();
-        let _ = stdin.read_line(&mut new_command); // Ignore errors for now. 
-        let mut initial_position = STARTPOS;
-        let mut divided_up_command = new_command.split_whitespace();
-        let first_part = divided_up_command.next();
-        match first_part {
-            None => panic!(),
-            Some(string) => {
-                // Todo. Also, todo: fix all of this junk. It's awful. 
-            }
-        }
-    }
+    // let mut initial_command = String::new();
+    // let stdin = io::stdin();
+    // let _ = stdin.read_line(&mut initial_command); // Ignore errors for now. 
+    // if initial_command == "uci" {
+    //     println!("id name Cladonia");
+    //     println!("id author JakkobMath");
+    //     println!("uci_not_yet_ok"); // Don't want to lie :) Needs to change to uciok later. 
+    //     let mut new_command = String::new();
+    //     let _ = stdin.read_line(&mut new_command); // Ignore errors for now. 
+    //     let mut initial_position = STARTPOS;
+    //     let mut divided_up_command = new_command.split_whitespace();
+    //     let first_part = divided_up_command.next();
+    //     match first_part {
+    //         None => panic!(),
+    //         Some(string) => {
+    //             // Todo. Also, todo: fix all of this junk. It's awful. 
+    //         }
+    //     }
+    // }
 
     let start = std::time::Instant::now();
 
@@ -593,4 +594,6 @@ fn main() {
 
     let time = start.elapsed();
     println!("Time taken: {0}",time.as_secs_f64());
+
+    println!("{0}", match 3.cmp(&4) {std::cmp::Ordering::Less => "less", _ => "not less"})
 }

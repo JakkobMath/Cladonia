@@ -10,3 +10,4 @@
 pub(crate) mod abstracts;
 
 pub(crate) mod implementations;
+pub(crate) mod uci;
