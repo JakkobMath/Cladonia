@@ -1,3 +1,8 @@
 /.vscode
 /.gitignore
-/.venv
+/.venv/Include
+/.venv/Lib\site-packages
+/.venv/Library
+/.venv/Scripts
+/.venv/share
+/.venv/pyvenv.cfg
